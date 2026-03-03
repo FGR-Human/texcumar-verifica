@@ -184,6 +184,7 @@ const SearchIcon = () => (
 );
 
 export default function TexcumarVerifica() {
+  const API_URL = "https://script.google.com/macros/s/AKfycbwx0V46aQJP0Zjo7g6t-YaHgJzndSa48kGV7mR-WSnlDabcr2ybAS6MHbWk46Lso4ri/exec";
   const [guia, setGuia] = useState("");
   const [resultado, setResultado] = useState(null);
   const [estado, setEstado] = useState("idle");
@@ -191,21 +192,24 @@ export default function TexcumarVerifica() {
 
   const normalizar = (str) => str.trim().replace(/\s+/g, "");
 
-  const verificar = () => {
-    if (!guia.trim()) return;
-    setEstado("loading");
-    setResultado(null);
-    setTimeout(() => {
-      const input = normalizar(guia).replace(/-/g, "");
-      // Match by last digits OR full number
-      const match = Object.keys(DB).find(k => {
-        const kClean = k.replace(/-/g, "");
-        return kClean === input || kClean.endsWith(input);
-      });
-      if (match) { setResultado(DB[match]); setEstado("found"); }
-      else setEstado("notfound");
-    }, 1200);
-  };
+const verificar = async () => {
+  if (!guia.trim()) return;
+  setEstado("loading");
+  setResultado(null);
+  try {
+    const url = `${API_URL}?numero=${encodeURIComponent(guia.trim())}`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (data.encontrado) {
+      setResultado(data.guia);
+      setEstado("found");
+    } else {
+      setEstado("notfound");
+    }
+  } catch(err) {
+    setEstado("notfound");
+  }
+};
 
   const reset = () => { setGuia(""); setResultado(null); setEstado("idle"); };
 
