@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ReactDOM from "react-dom/client";
 
 const API_URL = "https://script.google.com/macros/s/AKfycbwx0V46aQJP0Zjo7g6t-YaHgJzndSa48kGV7mR-WSnlDabcr2ybAS6MHbWk46Lso4ri/exec";
 
@@ -472,3 +473,5 @@ function Row({ label, value, mono, full, small }) {
     </div>
   );
 }
+
+ReactDOM.createRoot(document.getElementById("root")).render(<TexcumarVerifica />);
