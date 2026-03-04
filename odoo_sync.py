@@ -28,9 +28,8 @@ SHEETS_BATCH  = 200
 COLUMNS = [
     "numero","autorizacion","fechaAutorizacion","base","codigoSCI","globalGAP",
     "destinatario","rucDestino","nombreDest","destino","llegada","motivo",
-    "transportista","rucTransp","placa","partida","codProducto","unidad",
-    "descripcion","cantidad","cantBruta","tecnico","despacho","gavetas",
-    "plus","salinidad","temperatura",
+    "transportista","rucTransp","placa","codProducto","unidad",
+    "descripcion","cantidad","cantBruta","tecnico","despacho",
 ]
 
 SESSION_COOKIE = None
@@ -238,11 +237,9 @@ def transform(guide, guide_lines_map, stock_lines_map, vats_map):
         get_name(transp_raw),
         ruc_transp,
         str(guide.get("license_plate") or ""),
-        "",
         cod_producto, unidad, descripcion, cantidad, cant_bruta,
         get_name(guide.get("create_uid")),
         fmt_date(guide.get("date_start")),
-        "", "", "", "",
     ]
 
 
