@@ -1,0 +1,62 @@
+name: "Sync Odoo → Portal TEXCUMAR"
+
+on:
+  schedule:
+    # Ecuador = UTC-5
+    # 06:00 ECT = 11:00 UTC
+    - cron: "0 11 * * *"
+    # 14:00 ECT = 19:00 UTC
+    - cron: "0 19 * * *"
+    # 22:00 ECT = 03:00 UTC (día siguiente)
+    - cron: "0 3 * * *"
+
+  # Permite ejecutar manualmente desde GitHub → Actions → Run workflow
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: "Modo de ejecución"
+        required: false
+        default: "normal"
+        type: choice
+        options:
+          - normal
+          - debug
+
+jobs:
+  sync:
+    name: "Sincronizar Guías"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: "📥 Checkout código"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Setup Python 3.12"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: "📦 Instalar dependencias"
+        run: pip install -r requirements.txt
+
+      - name: "🔄 Ejecutar sincronización"
+        run: python odoo_sync.py
+        env:
+          ODOO_URL:          ${{ secrets.ODOO_URL }}
+          ODOO_DB:           ${{ secrets.ODOO_DB }}
+          ODOO_USER:         ${{ secrets.ODOO_USER }}
+          ODOO_PASSWORD:     ${{ secrets.ODOO_PASSWORD }}
+          GOOGLE_SHEET_ID:   ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_CREDS_JSON: ${{ secrets.GOOGLE_CREDS_JSON }}
+
+      - name: "✅ Sync completado"
+        if: success()
+        run: echo "Sincronización exitosa — $(date '+%Y-%m-%d %H:%M:%S UTC')"
+
+      - name: "❌ Notificar fallo"
+        if: failure()
+        run: |
+          echo "::error::La sincronización falló. Revisar logs arriba."
+          echo "Hora del fallo: $(date '+%Y-%m-%d %H:%M:%S UTC')"
