@@ -1,32 +1,46 @@
 import os
 import json
 import urllib.request
+import urllib.error
 
 ODOO_URL = os.environ["ODOO_URL"]
 ODOO_DB = os.environ["ODOO_DB"]
 ODOO_USER = os.environ["ODOO_USER"]
 ODOO_PASSWORD = os.environ["ODOO_PASSWORD"]
 
+SESSION_COOKIE = None
+
 
 def rpc(endpoint, params):
+    global SESSION_COOKIE
     url = f"{ODOO_URL}{endpoint}"
     data = json.dumps({"jsonrpc": "2.0", "method": "call", "id": 1, "params": params}).encode()
-    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    headers = {"Content-Type": "application/json"}
+    if SESSION_COOKIE:
+        headers["Cookie"] = SESSION_COOKIE
+    req = urllib.request.Request(url, data=data, headers=headers)
     with urllib.request.urlopen(req, timeout=30) as r:
+        if not SESSION_COOKIE:
+            raw_cookie = r.headers.get("Set-Cookie", "")
+            if raw_cookie:
+                SESSION_COOKIE = raw_cookie.split(";")[0]
         resp = json.loads(r.read())
     if "error" in resp:
-        raise RuntimeError(resp["error"])
+        raise RuntimeError(json.dumps(resp["error"], indent=2))
     return resp["result"]
 
 
 def authenticate():
-    uid = rpc("/web/dataset/call_kw", {
-        "model": "res.users",
-        "method": "authenticate",
-        "args": [ODOO_DB, ODOO_USER, ODOO_PASSWORD, {}],
-        "kwargs": {}
+    result = rpc("/web/session/authenticate", {
+        "db": ODOO_DB,
+        "login": ODOO_USER,
+        "password": ODOO_PASSWORD
     })
-    print(f"Autenticado UID: {uid}")
+    uid = result.get("uid")
+    if not uid:
+        raise RuntimeError(f"Autenticacion fallida: {result}")
+    print(f"Autenticado correctamente - UID: {uid}")
+    print(f"Usuario: {result.get('name')}")
     return uid
 
 
