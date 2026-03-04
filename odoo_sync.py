@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import urllib.request
+import time
 from datetime import datetime, timezone
 
 import gspread
@@ -22,217 +23,217 @@ SHEET_ID      = os.environ["GOOGLE_SHEET_ID"]
 GOOGLE_CREDS  = os.environ["GOOGLE_CREDS_JSON"]
 SHEET_TAB     = "Guias"
 
-# 27 columnas A-AA
+BATCH_SIZE    = 500   # guias por lote RPC
+SHEETS_BATCH  = 200   # filas por lote escritura Sheets
+
 COLUMNS = [
-    "numero",            # A  001-002-000013362
-    "autorizacion",      # B  numero autorizacion SRI
-    "fechaAutorizacion", # C  fecha autorizacion
-    "base",              # D  almacen origen
-    "codigoSCI",         # E  (vacio - campo manual TEXCUMAR)
-    "globalGAP",         # F  (vacio - campo manual TEXCUMAR)
-    "destinatario",      # G  nombre cliente
-    "rucDestino",        # H  RUC cliente
-    "nombreDest",        # I  nombre destino
-    "destino",           # J  ciudad destino
-    "llegada",           # K  fecha fin finalizacion
-    "motivo",            # L  observacion
-    "transportista",     # M  nombre transportista
-    "rucTransp",         # N  RUC transportista
-    "placa",             # O  license_plate
-    "partida",           # P  direccion partida
-    "codProducto",       # Q  codigo producto
-    "unidad",            # R  unidad medida
-    "descripcion",       # S  nombre producto
-    "cantidad",          # T  cantidad
-    "cantBruta",         # U  cantidad bruta
-    "tecnico",           # V  creado por
-    "despacho",          # W  date_start
-    "gavetas",           # X  (vacio - campo manual TEXCUMAR)
-    "plus",              # Y  (vacio - campo manual TEXCUMAR)
-    "salinidad",         # Z  (vacio - campo manual TEXCUMAR)
-    "temperatura",       # AA (vacio - campo manual TEXCUMAR)
+    "numero","autorizacion","fechaAutorizacion","base","codigoSCI","globalGAP",
+    "destinatario","rucDestino","nombreDest","destino","llegada","motivo",
+    "transportista","rucTransp","placa","partida","codProducto","unidad",
+    "descripcion","cantidad","cantBruta","tecnico","despacho","gavetas",
+    "plus","salinidad","temperatura",
 ]
 
 SESSION_COOKIE = None
 
 
-# ── Odoo RPC ─────────────────────────────────────────────────────────────────
+# ── RPC ───────────────────────────────────────────────────────────────────────
 def rpc(endpoint, params, retries=3):
     global SESSION_COOKIE
     url = f"{ODOO_URL}{endpoint}"
-    data = json.dumps({"jsonrpc": "2.0", "method": "call", "id": 1, "params": params}).encode()
+    data = json.dumps({"jsonrpc":"2.0","method":"call","id":1,"params":params}).encode()
     headers = {"Content-Type": "application/json"}
     if SESSION_COOKIE:
         headers["Cookie"] = SESSION_COOKIE
-
     for attempt in range(retries):
         try:
             req = urllib.request.Request(url, data=data, headers=headers)
             with urllib.request.urlopen(req, timeout=60) as r:
                 if not SESSION_COOKIE:
-                    raw = r.headers.get("Set-Cookie", "")
+                    raw = r.headers.get("Set-Cookie","")
                     if raw:
                         SESSION_COOKIE = raw.split(";")[0]
                 resp = json.loads(r.read())
             if "error" in resp:
-                raise RuntimeError(json.dumps(resp["error"]))
+                raise RuntimeError(json.dumps(resp["error"])[:200])
             return resp["result"]
         except Exception as e:
             if attempt < retries - 1:
-                log.warning(f"RPC intento {attempt+1} fallo: {e}. Reintentando...")
+                log.warning(f"RPC intento {attempt+1} fallo: {str(e)[:100]}")
+                time.sleep(2)
             else:
                 raise
 
 
 def authenticate():
     result = rpc("/web/session/authenticate", {
-        "db": ODOO_DB,
-        "login": ODOO_USER,
-        "password": ODOO_PASSWORD
+        "db": ODOO_DB, "login": ODOO_USER, "password": ODOO_PASSWORD
     })
     uid = result.get("uid")
     if not uid:
-        raise RuntimeError(f"Autenticacion fallida: {result}")
+        raise RuntimeError("Autenticacion fallida")
     log.info(f"Odoo: autenticado UID={uid}")
     return uid
 
 
-def search_read(model, domain, fields, limit=0):
+def search_read(model, domain, fields, limit=0, offset=0):
     return rpc("/web/dataset/call_kw", {
-        "model": model,
-        "method": "search_read",
+        "model": model, "method": "search_read",
         "args": [domain],
-        "kwargs": {"fields": fields, "limit": limit, "order": "id asc"}
+        "kwargs": {"fields": fields, "limit": limit,
+                   "offset": offset, "order": "id asc"}
     })
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
-def get_name(field_val):
-    if isinstance(field_val, (list, tuple)) and len(field_val) >= 2:
-        return str(field_val[1])
-    if isinstance(field_val, str):
-        return field_val
-    return ""
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def get_name(v):
+    if isinstance(v, (list, tuple)) and len(v) >= 2:
+        return str(v[1])
+    return str(v) if isinstance(v, str) else ""
 
 
-def fmt_date(val):
-    if not val:
+def fmt_date(v):
+    if not v:
         return ""
-    s = str(val)[:10]
+    s = str(v)[:10]
     try:
-        dt = datetime.strptime(s, "%Y-%m-%d")
-        return dt.strftime("%d/%m/%Y")
+        return datetime.strptime(s, "%Y-%m-%d").strftime("%d/%m/%Y")
     except Exception:
         return s
 
 
-# ── Obtener guias de Odoo ────────────────────────────────────────────────────
-def get_guides():
-    log.info("Odoo: consultando guias publicadas...")
-    guides = search_read(
-        "account.remission.guide",
-        [["state", "=", "posted"]],
-        [
-            "l10n_latam_document_number",  # numero limpio 001-002-000013362
-            "name",                         # fallback
-            "date_start",                   # fecha despacho
-            "date_end_finalization",         # fecha llegada/fin
-            "license_plate",                # placa
-            "partner_id",                   # TRANSPORTISTA
-            "client_id",                    # DESTINATARIO
-            "warehouse_id",                 # almacen origen
-            "observation",                  # observacion/motivo
-            "line_ids",                     # lineas de producto
-            "l10n_ec_authorization_number", # autorizacion SRI
-            "l10n_ec_authorization_date",   # fecha autorizacion SRI
-            "create_uid",                   # creado por (tecnico)
-            "state",
-        ]
-    )
-    log.info(f"Odoo: {len(guides)} guias encontradas")
-    return guides
+# ── Carga masiva de datos ─────────────────────────────────────────────────────
+def get_all_guides():
+    """Carga todas las guias en lotes de BATCH_SIZE."""
+    log.info("Odoo: contando guias publicadas...")
+    count_result = rpc("/web/dataset/call_kw", {
+        "model": "account.remission.guide",
+        "method": "search_count",
+        "args": [[["state","=","posted"]]],
+        "kwargs": {}
+    })
+    total = count_result
+    log.info(f"Odoo: {total} guias a sincronizar")
 
-
-def get_lines(line_ids):
-    if not line_ids:
-        return []
-    return search_read(
-        "account.remission.guide.line",
-        [["id", "in", line_ids]],
-        ["product_id", "product_uom_id", "product_qty", "qty_done", "name"]
-    )
-
-
-def get_partner_ruc(partner_id):
-    if not partner_id:
-        return ""
-    pid = partner_id[0] if isinstance(partner_id, (list, tuple)) else partner_id
-    result = search_read(
-        "res.partner",
-        [["id", "=", pid]],
-        ["vat"],
-        limit=1
-    )
-    if result:
-        return result[0].get("vat") or ""
-    return ""
-
-
-# ── Transformar guia → fila ──────────────────────────────────────────────────
-def transform(guide, lines, ruc_cliente, ruc_transp):
-    # Numero limpio
-    numero = (
-        guide.get("l10n_latam_document_number") or
-        get_name(guide.get("name", "")).replace("REM ", "").strip()
-    )
-
-    # Producto (primera linea)
-    descripcion = ""
-    cod_producto = ""
-    unidad = ""
-    cantidad = ""
-    cant_bruta = ""
-    if lines:
-        l = lines[0]
-        prod = l.get("product_id", False)
-        descripcion = get_name(prod)
-        cod_producto = str(prod[0]) if isinstance(prod, (list, tuple)) else ""
-        uom = l.get("product_uom_id", False)
-        unidad = get_name(uom)
-        qty = l.get("qty_done") or l.get("product_qty") or 0
-        cantidad = str(int(qty)) if qty else ""
-        cant_bruta = cantidad
-
-    row = [
-        numero,                                              # A numero
-        str(guide.get("l10n_ec_authorization_number") or ""), # B autorizacion
-        fmt_date(guide.get("l10n_ec_authorization_date")),  # C fechaAutorizacion
-        get_name(guide.get("warehouse_id")),                 # D base
-        "",                                                  # E codigoSCI
-        "",                                                  # F globalGAP
-        get_name(guide.get("client_id")),                    # G destinatario
-        ruc_cliente,                                         # H rucDestino
-        get_name(guide.get("client_id")),                    # I nombreDest
-        "",                                                  # J destino
-        fmt_date(guide.get("date_end_finalization")),        # K llegada
-        str(guide.get("observation") or ""),                 # L motivo
-        get_name(guide.get("partner_id")),                   # M transportista
-        ruc_transp,                                          # N rucTransp
-        str(guide.get("license_plate") or ""),               # O placa
-        "",                                                  # P partida
-        cod_producto,                                        # Q codProducto
-        unidad,                                              # R unidad
-        descripcion,                                         # S descripcion
-        cantidad,                                            # T cantidad
-        cant_bruta,                                          # U cantBruta
-        get_name(guide.get("create_uid")),                   # V tecnico
-        fmt_date(guide.get("date_start")),                   # W despacho
-        "",                                                  # X gavetas
-        "",                                                  # Y plus
-        "",                                                  # Z salinidad
-        "",                                                  # AA temperatura
+    fields = [
+        "l10n_latam_document_number","name","date_start","date_end_finalization",
+        "license_plate","partner_id","client_id","warehouse_id","observation",
+        "line_ids","l10n_ec_authorization_number","l10n_ec_authorization_date",
+        "create_uid",
     ]
-    return row
+
+    all_guides = []
+    offset = 0
+    while offset < total:
+        batch = search_read(
+            "account.remission.guide",
+            [["state","=","posted"]],
+            fields, limit=BATCH_SIZE, offset=offset
+        )
+        all_guides.extend(batch)
+        log.info(f"  Guias cargadas: {len(all_guides)}/{total}")
+        offset += BATCH_SIZE
+        time.sleep(0.3)
+
+    return all_guides
+
+
+def get_all_lines(all_line_ids):
+    """Carga todas las lineas de producto en un solo lote."""
+    if not all_line_ids:
+        return {}
+    log.info(f"Odoo: cargando {len(all_line_ids)} lineas de producto...")
+
+    # Intentar cargar lineas — si falla usar campos minimos
+    try:
+        lines = search_read(
+            "account.remission.guide.line",
+            [["id","in", all_line_ids]],
+            ["id","product_id","product_uom_id","product_qty","qty_done"]
+        )
+    except Exception as e:
+        log.warning(f"Error cargando lineas completas: {e}")
+        try:
+            lines = search_read(
+                "account.remission.guide.line",
+                [["id","in", all_line_ids]],
+                ["id","product_id","product_qty"]
+            )
+        except Exception as e2:
+            log.warning(f"Error cargando lineas basicas: {e2}")
+            return {}
+
+    # Indexar por id para busqueda rapida
+    return {l["id"]: l for l in lines}
+
+
+def get_partner_vats(partner_ids):
+    """Carga RUC de todos los partners en un solo query."""
+    if not partner_ids:
+        return {}
+    unique_ids = list(set(partner_ids))
+    log.info(f"Odoo: cargando RUC de {len(unique_ids)} partners...")
+    try:
+        partners = search_read(
+            "res.partner",
+            [["id","in", unique_ids]],
+            ["id","vat"]
+        )
+        return {p["id"]: (p.get("vat") or "") for p in partners}
+    except Exception as e:
+        log.warning(f"Error cargando RUC: {e}")
+        return {}
+
+
+# ── Transformar ───────────────────────────────────────────────────────────────
+def transform(guide, lines_map, vats_map):
+    numero = (guide.get("l10n_latam_document_number") or
+              get_name(guide.get("name","")).replace("REM ","").strip())
+
+    # Producto de la primera linea
+    descripcion = cod_producto = unidad = cantidad = cant_bruta = ""
+    line_ids = guide.get("line_ids", [])
+    if line_ids:
+        first_line = lines_map.get(line_ids[0])
+        if first_line:
+            prod = first_line.get("product_id", False)
+            descripcion = get_name(prod)
+            cod_producto = str(prod[0]) if isinstance(prod,(list,tuple)) else ""
+            uom = first_line.get("product_uom_id", False)
+            unidad = get_name(uom)
+            qty = first_line.get("qty_done") or first_line.get("product_qty") or 0
+            cantidad = str(int(float(qty))) if qty else ""
+            cant_bruta = cantidad
+
+    # RUC de cliente y transportista
+    client_raw = guide.get("client_id")
+    transp_raw = guide.get("partner_id")
+    client_id  = client_raw[0] if isinstance(client_raw,(list,tuple)) else None
+    transp_id  = transp_raw[0] if isinstance(transp_raw,(list,tuple)) else None
+    ruc_cliente = vats_map.get(client_id, "") if client_id else ""
+    ruc_transp  = vats_map.get(transp_id, "") if transp_id else ""
+
+    return [
+        numero,
+        str(guide.get("l10n_ec_authorization_number") or ""),
+        fmt_date(guide.get("l10n_ec_authorization_date")),
+        get_name(guide.get("warehouse_id")),
+        "", "",
+        get_name(client_raw),
+        ruc_cliente,
+        get_name(client_raw),
+        "",
+        fmt_date(guide.get("date_end_finalization")),
+        str(guide.get("observation") or ""),
+        get_name(transp_raw),
+        ruc_transp,
+        str(guide.get("license_plate") or ""),
+        "",
+        cod_producto, unidad, descripcion, cantidad, cant_bruta,
+        get_name(guide.get("create_uid")),
+        fmt_date(guide.get("date_start")),
+        "", "", "", "",
+    ]
 
 
 # ── Google Sheets ─────────────────────────────────────────────────────────────
@@ -250,85 +251,117 @@ def get_sheet():
         sheet = spreadsheet.worksheet(SHEET_TAB)
         log.info(f"Sheets: pestana '{SHEET_TAB}' encontrada")
     except gspread.WorksheetNotFound:
-        sheet = spreadsheet.add_worksheet(title=SHEET_TAB, rows=2000, cols=27)
+        sheet = spreadsheet.add_worksheet(title=SHEET_TAB, rows=10000, cols=27)
         log.info(f"Sheets: pestana '{SHEET_TAB}' creada")
     return sheet
 
 
-def ensure_header(sheet):
-    first_row = sheet.row_values(1)
-    if not first_row or first_row[0] != "numero":
+def bulk_write(sheet, rows):
+    """Escribe todas las filas en lotes — mucho mas rapido que una por una."""
+    # Leer existentes para saber cuales actualizar
+    log.info("Sheets: leyendo filas existentes...")
+    existing_vals = sheet.get_all_values()
+
+    # Asegurar header
+    if not existing_vals or existing_vals[0][0] != "numero":
         sheet.insert_row(COLUMNS, index=1)
+        existing_vals = [COLUMNS]
         log.info("Sheets: headers insertados")
 
-
-def upsert(sheet, rows):
-    ensure_header(sheet)
-    all_vals = sheet.get_all_values()
-    existing = {}
-    for i, row in enumerate(all_vals[1:], start=2):
+    existing_map = {}
+    for i, row in enumerate(existing_vals[1:], start=2):
         if row and row[0]:
-            existing[row[0].strip()] = i
+            existing_map[row[0].strip()] = i
 
-    inserted = updated = skipped = 0
+    new_rows = []
+    update_data = []
+
     for row in rows:
         numero = row[0].strip() if row[0] else ""
         if not numero:
-            skipped += 1
             continue
-        if numero in existing:
-            col_end = chr(ord("A") + len(row) - 1) if len(row) <= 26 else "AA"
-            idx = existing[numero]
-            sheet.update(f"A{idx}:{col_end}{idx}", [row])
-            updated += 1
+        if numero in existing_map:
+            update_data.append((existing_map[numero], row))
         else:
-            sheet.append_row(row, value_input_option="USER_ENTERED")
-            inserted += 1
-            log.info(f"  + {numero}")
+            new_rows.append(row)
 
-    return inserted, updated, skipped
+    log.info(f"Sheets: {len(new_rows)} nuevas, {len(update_data)} a actualizar")
+
+    # Insertar nuevas en lotes
+    if new_rows:
+        for i in range(0, len(new_rows), SHEETS_BATCH):
+            batch = new_rows[i:i+SHEETS_BATCH]
+            sheet.append_rows(batch, value_input_option="USER_ENTERED")
+            log.info(f"  Insertadas {min(i+SHEETS_BATCH, len(new_rows))}/{len(new_rows)}")
+            time.sleep(1)
+
+    # Actualizar existentes en lotes usando batch_update
+    if update_data:
+        for i in range(0, len(update_data), SHEETS_BATCH):
+            batch = update_data[i:i+SHEETS_BATCH]
+            col_end = "AA"
+            updates = [{
+                "range": f"A{idx}:{col_end}{idx}",
+                "values": [row]
+            } for idx, row in batch]
+            sheet.batch_update(updates)
+            log.info(f"  Actualizadas {min(i+SHEETS_BATCH, len(update_data))}/{len(update_data)}")
+            time.sleep(1)
+
+    return len(new_rows), len(update_data)
 
 
-# ── Main ─────────────────────────────────────────────────────────────────────
+# ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     start = datetime.now(timezone.utc)
-    log.info("=" * 50)
+    log.info("="*50)
     log.info("TEXCUMAR Sync — Inicio")
     log.info(f"UTC: {start.strftime('%Y-%m-%d %H:%M:%S')}")
-    log.info("=" * 50)
+    log.info("="*50)
 
     authenticate()
-    guides = get_guides()
 
+    # 1. Cargar guias en lotes
+    guides = get_all_guides()
     if not guides:
         log.info("No hay guias para sincronizar.")
         return
 
-    sheet = get_sheet()
-    rows = []
+    # 2. Recopilar IDs de lineas y partners para queries masivas
+    all_line_ids = []
+    all_partner_ids = []
+    for g in guides:
+        all_line_ids.extend(g.get("line_ids", []))
+        for field in ("client_id", "partner_id"):
+            v = g.get(field)
+            if isinstance(v, (list, tuple)) and v:
+                all_partner_ids.append(v[0])
 
-    for guide in guides:
+    # 3. Cargar lineas y RUCs en queries masivas (no una por una)
+    # Limitar line_ids a primeros 5000 para evitar timeout
+    lines_map = get_all_lines(all_line_ids[:5000]) if all_line_ids else {}
+    vats_map  = get_partner_vats(all_partner_ids)
+
+    # 4. Transformar
+    rows = []
+    for g in guides:
         try:
-            line_ids = guide.get("line_ids", [])
-            lines = get_lines(line_ids)
-            ruc_cliente = get_partner_ruc(guide.get("client_id"))
-            ruc_transp  = get_partner_ruc(guide.get("partner_id"))
-            row = transform(guide, lines, ruc_cliente, ruc_transp)
-            rows.append(row)
+            rows.append(transform(g, lines_map, vats_map))
         except Exception as e:
-            log.warning(f"Error en guia {guide.get('name','?')}: {e}")
-            continue
+            log.warning(f"Error transformando {g.get('name','?')}: {e}")
 
     log.info(f"Transformadas {len(rows)} guias")
-    inserted, updated, skipped = upsert(sheet, rows)
+
+    # 5. Escribir en Sheets
+    sheet = get_sheet()
+    inserted, updated = bulk_write(sheet, rows)
 
     elapsed = (datetime.now(timezone.utc) - start).total_seconds()
-    log.info("=" * 50)
-    log.info(f"Sync completado en {elapsed:.1f}s")
-    log.info(f"  Insertadas:  {inserted}")
+    log.info("="*50)
+    log.info(f"Sync completado en {elapsed:.0f}s ({elapsed/60:.1f} min)")
+    log.info(f"  Nuevas:      {inserted}")
     log.info(f"  Actualizadas: {updated}")
-    log.info(f"  Omitidas:    {skipped}")
-    log.info("=" * 50)
+    log.info("="*50)
 
 
 main()
