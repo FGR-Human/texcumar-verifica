@@ -426,7 +426,7 @@ export default function TexcumarVerifica() {
               ))}
             </div>
             <p style={{textAlign:"center",marginTop:24,fontSize:12,color:"#1e293b"}}>
-              Demo — pruebe con: <code style={{color:"#38bdf8",background:"rgba(56,189,248,0.08)",padding:"2px 8px",borderRadius:4}}>58498</code> · <code style={{color:"#38bdf8",background:"rgba(56,189,248,0.08)",padding:"2px 8px",borderRadius:4}}>14385</code> · <code style={{color:"#38bdf8",background:"rgba(56,189,248,0.08)",padding:"2px 8px",borderRadius:4}}>5176</code>
+
             </p>
           </>
         )}
