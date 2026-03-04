@@ -263,7 +263,7 @@ def bulk_write(sheet, rows):
     existing_vals = sheet.get_all_values()
 
     # Asegurar header
-    if not existing_vals or existing_vals[0][0] != "numero":
+    if not existing_vals or not existing_vals[0] or existing_vals[0][0] != "numero":
         sheet.insert_row(COLUMNS, index=1)
         existing_vals = [COLUMNS]
         log.info("Sheets: headers insertados")
