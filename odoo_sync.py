@@ -156,32 +156,22 @@ def get_guide_lines(all_line_ids):
 
 def get_stock_lines(all_stock_ids):
     """
-    Carga account.remission.guide.stock.line — contiene producto y cantidad.
+    Carga account.remission.guide.stock.line
+    Campo confirmado: quantity (no quantity_done ni qty_done)
     """
     if not all_stock_ids:
         return {}
     log.info(f"Odoo: cargando {len(all_stock_ids)} stock.lines...")
     try:
-        # Intentar con campos completos
         lines = search_read(
             "account.remission.guide.stock.line",
             [["id","in", all_stock_ids[:3000]]],
-            ["id", "product_id", "product_uom_id", "product_qty",
-             "quantity_done", "qty_done"]
+            ["id", "product_id", "product_uom_id", "quantity"]
         )
         return {l["id"]: l for l in lines}
-    except Exception:
-        try:
-            # Fallback campos minimos
-            lines = search_read(
-                "account.remission.guide.stock.line",
-                [["id","in", all_stock_ids[:3000]]],
-                ["id", "product_id", "product_qty"]
-            )
-            return {l["id"]: l for l in lines}
-        except Exception as e2:
-            log.warning(f"Error cargando stock.lines: {e2}")
-            return {}
+    except Exception as e:
+        log.warning(f"Error cargando stock.lines: {e}")
+        return {}
 
 
 def get_partner_vats(partner_ids):
@@ -220,8 +210,7 @@ def transform(guide, guide_lines_map, stock_lines_map, vats_map):
                     cod_producto = str(get_id(prod)) if get_id(prod) else ""
                     uom = sl.get("product_uom_id", False)
                     unidad = get_name(uom)
-                    qty = (sl.get("quantity_done") or sl.get("qty_done") or
-                           sl.get("product_qty") or 0)
+                    qty = sl.get("quantity") or 0
                     try:
                         cantidad = str(int(float(qty))) if qty else ""
                     except Exception:
