@@ -148,18 +148,34 @@ PRODUCT_FIELD_MAP = {
 def get_guide_records(models, uid):
     """Obtiene todos los registros de guías de remisión de Odoo."""
 
-    # Descubrir campos disponibles
+    # ── Verificar modelo ────────────────────────────────────────────────────
     available = discover_fields(models, uid, "account.remission.guide")
     if not available:
-        # Intentar con modelo alternativo
         available = discover_fields(models, uid, "stock.picking")
         if available:
             print("⚠️  Usando stock.picking como modelo base")
             return get_from_stock_picking(models, uid)
+        raise SystemExit("❌ No se encontró modelo de guías de remisión en Odoo.")
 
     print(f"   Campos disponibles en account.remission.guide: {len(available)}")
 
-    # Construir lista de campos a pedir — solo los que existen
+    # ── Contar sin filtro ───────────────────────────────────────────────────
+    total_all = odoo_call(models, uid, "account.remission.guide", "search_count", [[]])
+    print(f"   >> TOTAL registros sin filtro: {total_all}")
+
+    if total_all == 0:
+        raise SystemExit("❌ account.remission.guide está vacío. "
+                         "Verifica permisos del usuario Odoo o que sea la DB correcta.")
+
+    # ── Diagnóstico de estados ──────────────────────────────────────────────
+    if "state" in available:
+        from collections import Counter
+        sample = odoo_call(models, uid, "account.remission.guide", "search_read",
+                           [[]], {"fields": ["state"], "limit": 500})
+        counts = Counter(str(r.get("state", "")) for r in sample)
+        print(f"   >> Estados en muestra: {dict(counts)}")
+
+    # ── Construir lista de campos ───────────────────────────────────────────
     simple_fields = []
     for alternatives in FIELD_MAP.values():
         for f in alternatives:
@@ -167,33 +183,28 @@ def get_guide_records(models, uid):
             if base in available:
                 simple_fields.append(base)
                 break
-
-    # Siempre incluir campos clave
     for must in ["name", "id", "picking_id", "move_ids", "move_line_ids",
-                 "l10n_ec_remission_line_ids"]:
+                 "l10n_ec_remission_line_ids", "state"]:
         if must in available and must not in simple_fields:
             simple_fields.append(must)
-
     simple_fields = list(set(simple_fields))
-    print(f"   Pidiendo {len(simple_fields)} campos al modelo guía")
+    print(f"   Pidiendo {len(simple_fields)} campos")
 
-    # Fetch en batches
-    domain = [("state", "=", "done")]
-    total = odoo_call(models, uid, "account.remission.guide", "search_count", [domain])
-    print(f"   Total guías en estado 'done': {total}")
-
+    # ── Fetch SIN filtro de estado ──────────────────────────────────────────
+    # El modelo account.remission.guide SOLO contiene guías de remisión
+    # No necesitamos filtrar por estado — traemos todas
     all_records = []
     offset = 0
-    while offset < total:
+    while offset < total_all:
         batch = odoo_call(models, uid, "account.remission.guide", "search_read",
-                          [domain],
-                          {"fields": simple_fields, "limit": BATCH_SIZE, "offset": offset,
-                           "order": "id asc"})
-        all_records.extend(batch)
-        offset += len(batch)
-        print(f"   Descargadas {min(offset, total)}/{total} guías...")
+                          [[]],
+                          {"fields": simple_fields, "limit": BATCH_SIZE,
+                           "offset": offset, "order": "id asc"})
         if not batch:
             break
+        all_records.extend(batch)
+        offset += len(batch)
+        print(f"   Descargadas {offset}/{total_all}...")
 
     return all_records, available
 
