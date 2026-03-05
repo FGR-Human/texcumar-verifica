@@ -1,23 +1,48 @@
 #!/usr/bin/env python3
 """
-odoo_sync.py — TEXCUMAR Remission Guide Sync
-Fetches guides from Odoo → Google Sheets (pestaña 'Guias')
+odoo_sync.py — TEXCUMAR v3 DEFINITIVO
+Sincroniza account.remission.guide → Google Sheets (pestaña 'Guias')
 
-Campos extraídos: 26 columnas
-  Encabezado (account.remission.guide):
-    numero, autorizacion, fechaAutorizacion, base, codigoSCI, globalGAP,
-    fechaInicio, fechaFin, destinatario, rucDestino, nombreDest, destino,
-    llegada, motivo, transportista, rucTransp, placa, tecnico, despacho
-  Producto (stock.move.line — JOIN por picking_id):
-    codProducto, unidad, descripcion, cantidad, cantBruta
-  Adicionales (stock.move.line):
-    gavetas, plus, salinidad, temperatura
+MAPEO CONFIRMADO por diagnóstico directo de Odoo 17:
+
+  ENCABEZADO (account.remission.guide):
+    numero            ← l10n_latam_document_number
+    autorizacion      ← l10n_ec_authorization_number
+    fechaAutorizacion ← l10n_ec_authorization_date
+    base              ← warehouse_id[name]
+    fechaInicio       ← date_start
+    fechaFin          ← date_end
+    placa             ← license_plate
+    cantidad          ← animal_qty_total
+    codigoSCI         ← NO EXISTE en Odoo → vacío
+    globalGAP         ← NO EXISTE en Odoo → vacío
+
+  CLIENTE (res.partner via client_id):
+    destinatario ← parent_name (empresa madre) o name
+    rucDestino   ← vat
+    nombreDest   ← name (nombre del punto de entrega)
+    destino      ← state_id + city + sector
+    llegada      ← sector[name] o street
+
+  TRANSPORTISTA (res.partner via partner_id):
+    transportista ← name
+    rucTransp     ← vat
+
+  LÍNEA DE GUÍA (account.remission.guide.line via line_ids):
+    motivo       ← reason_id[name]
+    picking_id   → para obtener stock.move
+
+  STOCK MOVE (stock.move via picking_id, state=done):
+    codProducto  ← product_id[name] → extraer [CODE]
+    unidad       ← product_uom[name]
+    descripcion  ← description_picking
+    cantBruta    ← gross_quantity
+
+  GUIDE STOCK LINE (account.remission.guide.stock.line via stock_move_lines):
+    tecnico, despacho, gavetas, plus ← auto-descubiertos
 """
 
-import os
-import sys
-import json
-import xmlrpc.client
+import os, re, sys, json, xmlrpc.client
 from datetime import datetime
 
 import gspread
@@ -32,10 +57,9 @@ ODOO_PASSWORD = os.environ["ODOO_PASSWORD"]
 SHEET_ID      = os.environ["GOOGLE_SHEET_ID"]
 CREDS_JSON    = os.environ["GOOGLE_CREDS_JSON"]
 
-SHEET_TAB     = "Guias"
-BATCH_SIZE    = 200
+SHEET_TAB  = "Guias"
+BATCH_SIZE = 200
 
-# Columnas finales en el Sheet (en este orden exacto)
 COLUMNS = [
     "numero", "autorizacion", "fechaAutorizacion", "base",
     "codigoSCI", "globalGAP", "fechaInicio", "fechaFin",
@@ -45,375 +69,317 @@ COLUMNS = [
     "tecnico", "despacho", "gavetas", "plus",
 ]
 
+# Candidatos para campos de guide.stock.line (en orden de preferencia)
+TECNICO_CANDIDATES  = ["technician_id", "technician", "tech_id", "x_tecnico",
+                        "responsible_id", "user_id", "employee_id"]
+DESPACHO_CANDIDATES = ["dispatch_type", "packaging_type", "x_despacho",
+                        "container_type", "packing", "package_type_id"]
+GAVETAS_CANDIDATES  = ["containers", "gavetas", "x_gavetas", "qty_packages",
+                        "number_of_packages", "packages", "cardboard", "boxes"]
+PLUS_CANDIDATES     = ["plus", "x_plus", "percentage_plus", "extra_qty",
+                        "additional_qty", "bonus"]
+
+# ─── ODOO RPC ─────────────────────────────────────────────────────────────────
+
+def connect_odoo():
+    common = xmlrpc.client.ServerProxy(f"{ODOO_URL}/xmlrpc/2/common", allow_none=True)
+    uid = common.authenticate(ODOO_DB, ODOO_USER, ODOO_PASSWORD, {})
+    if not uid:
+        sys.exit("❌ Autenticación Odoo fallida.")
+    print(f"✅ Odoo conectado — UID {uid}")
+    models = xmlrpc.client.ServerProxy(f"{ODOO_URL}/xmlrpc/2/object", allow_none=True)
+    return uid, models
+
+def rpc(models, uid, model, method, args, kw=None):
+    return models.execute_kw(
+        ODOO_DB, uid, ODOO_PASSWORD, model, method, args, kw or {}
+    )
+
+def batch_search_read(models, uid, model, domain, fields, order="id asc"):
+    """Descarga TODOS los registros en lotes."""
+    total = rpc(models, uid, model, "search_count", [domain])
+    print(f"   {model}: {total} registros")
+    results, offset = [], 0
+    while offset < total:
+        chunk = rpc(models, uid, model, "search_read", [domain],
+                    {"fields": fields, "limit": BATCH_SIZE,
+                     "offset": offset, "order": order})
+        if not chunk:
+            break
+        results.extend(chunk)
+        offset += len(chunk)
+        if total > BATCH_SIZE:
+            print(f"   {model}: {offset}/{total} ({int(offset/total*100)}%)")
+    return results
+
+def batch_read(models, uid, model, ids, fields):
+    """Lee registros por lista de IDs."""
+    if not ids:
+        return []
+    ids = list(set(ids))
+    results = []
+    for i in range(0, len(ids), BATCH_SIZE):
+        chunk = rpc(models, uid, model, "read",
+                    [ids[i:i+BATCH_SIZE]], {"fields": fields})
+        results.extend(chunk)
+    return results
+
 # ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 def fmt_date(val):
-    """Convierte datetime/date de Odoo a string DD/MM/YYYY."""
     if not val or val is False:
         return ""
-    if isinstance(val, str):
-        # ISO: "2026-01-27 00:00:00" o "2026-01-27"
-        try:
-            d = datetime.strptime(val[:10], "%Y-%m-%d")
-            return d.strftime("%d/%m/%Y")
-        except Exception:
-            return val
-    return str(val)
-
-def safe(val):
-    """Limpia False/None de Odoo a string vacío."""
-    if val is False or val is None:
-        return ""
-    if isinstance(val, (list, tuple)):
-        # Odoo many2one retorna [id, name]
-        return str(val[1]) if len(val) > 1 else str(val[0])
-    return str(val).strip()
-
-def safe_num(val):
-    """Limpia número: convierte float .0 a int, False a ''."""
-    if val is False or val is None:
-        return ""
     try:
-        f = float(val)
-        return str(int(f)) if f == int(f) else str(f)
+        return datetime.strptime(str(val)[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
     except Exception:
         return str(val)
 
-# ─── ODOO CONNECTION ─────────────────────────────────────────────────────────
+def m2o_name(val):
+    if not val or val is False:
+        return ""
+    return str(val[1]).strip() if isinstance(val, (list, tuple)) and len(val) > 1 else str(val).strip()
 
-def odoo_connect():
-    common = xmlrpc.client.ServerProxy(f"{ODOO_URL}/xmlrpc/2/common")
-    uid = common.authenticate(ODOO_DB, ODOO_USER, ODOO_PASSWORD, {})
-    if not uid:
-        raise SystemExit("❌ Error: autenticación Odoo fallida. Verifica ODOO_USER y ODOO_PASSWORD.")
-    print(f"✅ Conectado a Odoo como UID {uid}")
-    models = xmlrpc.client.ServerProxy(f"{ODOO_URL}/xmlrpc/2/object")
-    return uid, models
+def m2o_id(val):
+    if not val or val is False:
+        return None
+    return val[0] if isinstance(val, (list, tuple)) else int(val)
 
-def odoo_call(models, uid, model, method, args, kwargs=None):
-    return models.execute_kw(
-        ODOO_DB, uid, ODOO_PASSWORD,
-        model, method, args, kwargs or {}
-    )
+def safe(val):
+    if val is False or val is None:
+        return ""
+    if isinstance(val, float):
+        return str(int(val)) if val == int(val) else str(round(val, 4))
+    return str(val).strip()
 
-# ─── FIELD DISCOVERY ─────────────────────────────────────────────────────────
+def extract_code(product_name):
+    """'[N50002] Nauplios...' → 'N50002'"""
+    if not product_name:
+        return ""
+    m = re.match(r'\[([^\]]+)\]', str(product_name))
+    return m.group(1) if m else ""
 
-def discover_fields(models, uid, model):
-    """Retorna set de nombres de campos disponibles en el modelo."""
-    try:
-        fields = odoo_call(models, uid, model, "fields_get", [],
-                           {"attributes": ["string", "type"]})
-        return set(fields.keys())
-    except Exception:
-        return set()
+def strip_code(product_name):
+    """'[N50002] Nauplios...' → 'Nauplios...'"""
+    if not product_name:
+        return ""
+    return re.sub(r'^\[[^\]]+\]\s*', '', str(product_name)).strip()
 
-# ─── FETCH GUIDES ────────────────────────────────────────────────────────────
+def build_destino(partner):
+    """Construye 'Provincia - CANTON - Sector' desde el partner."""
+    state  = re.sub(r'\s*\(EC\)\s*', '', m2o_name(partner.get("state_id"))).strip()
+    city   = safe(partner.get("city", ""))
+    sector = m2o_name(partner.get("sector"))
+    street = safe(partner.get("street", ""))
+    punto  = sector or street
+    parts  = [p for p in [state, city, punto] if p]
+    return " - ".join(parts)
 
-# Posibles nombres de campos en Odoo según versión/localización
-FIELD_MAP = {
-    # Campo Sheet        : [opciones de nombre en Odoo, en orden de preferencia]
-    "numero"            : ["name", "l10n_ec_name", "number"],
-    "autorizacion"      : ["l10n_ec_authorization_number", "authorization_number", "l10n_latam_document_number"],
-    "fechaAutorizacion" : ["l10n_ec_authorization_date", "invoice_date", "date_order", "date"],
-    "base"              : ["location_dest_id", "warehouse_id", "origin", "note"],
-    "codigoSCI"         : ["l10n_ec_sci_code", "sci_code", "ref"],
-    "globalGAP"         : ["l10n_ec_global_gap", "global_gap_number", "x_global_gap"],
-    "fechaInicio"       : ["scheduled_date", "date_done", "date", "sale_id.date_order"],
-    "fechaFin"          : ["date_deadline", "date_done", "date"],
-    "destinatario"      : ["partner_id", "dest_partner_id"],
-    "rucDestino"        : ["partner_id.vat", "l10n_ec_ruc_dest"],
-    "nombreDest"        : ["l10n_ec_dest_name", "dest_name", "partner_id.name"],
-    "destino"           : ["l10n_ec_dest_address", "dest_address"],
-    "llegada"           : ["l10n_ec_dest_point", "dest_point", "l10n_ec_arrival_point"],
-    "motivo"            : ["l10n_ec_motive", "motive", "origin"],
-    "transportista"     : ["carrier_id", "l10n_ec_carrier_id"],
-    "rucTransp"         : ["l10n_ec_carrier_vat", "carrier_id.vat"],
-    "placa"             : ["l10n_ec_plate", "plate", "x_plate"],
-    "tecnico"           : ["l10n_ec_technician", "technician_id", "x_tecnico"],
-    "despacho"          : ["l10n_ec_dispatch_type", "dispatch_type", "x_despacho"],
-}
+def first_val(record, candidates):
+    """Primer campo no-vacío de la lista de candidatos."""
+    if not record:
+        return ""
+    for c in candidates:
+        v = record.get(c)
+        if v is not False and v is not None and str(v).strip() not in ("", "False", "0"):
+            if isinstance(v, (list, tuple)) and len(v) > 1:
+                return str(v[1]).strip()
+            return safe(v)
+    return ""
 
-# Campos de producto — se buscan en stock.move.line o en las líneas de la guía
-PRODUCT_FIELD_MAP = {
-    "codProducto" : ["product_id.default_code", "product_id", "x_product_code"],
-    "unidad"      : ["product_uom_id", "product_uom", "uom_id"],
-    "descripcion" : ["product_id.name", "description", "product_id"],
-    "cantidad"    : ["quantity", "qty_done", "product_uom_qty", "quantity_done"],
-    "cantBruta"   : ["l10n_ec_gross_weight", "gross_weight", "x_cant_bruta", "weight"],
-    "gavetas"     : ["l10n_ec_containers", "x_gavetas", "number_of_packages"],
-    "plus"        : ["x_plus", "l10n_ec_plus"],
-}
+# ─── FETCH ────────────────────────────────────────────────────────────────────
 
-
-def get_guide_records(models, uid):
-    """Obtiene todos los registros de guías de remisión de Odoo."""
-
-    # ── Verificar modelo ────────────────────────────────────────────────────
-    available = discover_fields(models, uid, "account.remission.guide")
-    if not available:
-        available = discover_fields(models, uid, "stock.picking")
-        if available:
-            print("⚠️  Usando stock.picking como modelo base")
-            return get_from_stock_picking(models, uid)
-        raise SystemExit("❌ No se encontró modelo de guías de remisión en Odoo.")
-
-    print(f"   Campos disponibles en account.remission.guide: {len(available)}")
-
-    # ── Contar sin filtro ───────────────────────────────────────────────────
-    total_all = odoo_call(models, uid, "account.remission.guide", "search_count", [[]])
-    print(f"   >> TOTAL registros sin filtro: {total_all}")
-
-    if total_all == 0:
-        raise SystemExit("❌ account.remission.guide está vacío. "
-                         "Verifica permisos del usuario Odoo o que sea la DB correcta.")
-
-    # ── Diagnóstico de estados ──────────────────────────────────────────────
-    if "state" in available:
-        from collections import Counter
-        sample = odoo_call(models, uid, "account.remission.guide", "search_read",
-                           [[]], {"fields": ["state"], "limit": 500})
-        counts = Counter(str(r.get("state", "")) for r in sample)
-        print(f"   >> Estados en muestra: {dict(counts)}")
-
-    # ── Construir lista de campos ───────────────────────────────────────────
-    simple_fields = []
-    for alternatives in FIELD_MAP.values():
-        for f in alternatives:
-            base = f.split(".")[0]
-            if base in available:
-                simple_fields.append(base)
-                break
-    for must in ["name", "id", "picking_id", "move_ids", "move_line_ids",
-                 "l10n_ec_remission_line_ids", "state"]:
-        if must in available and must not in simple_fields:
-            simple_fields.append(must)
-    simple_fields = list(set(simple_fields))
-    print(f"   Pidiendo {len(simple_fields)} campos")
-
-    # ── Fetch SIN filtro de estado ──────────────────────────────────────────
-    # El modelo account.remission.guide SOLO contiene guías de remisión
-    # No necesitamos filtrar por estado — traemos todas
-    all_records = []
-    offset = 0
-    while offset < total_all:
-        batch = odoo_call(models, uid, "account.remission.guide", "search_read",
-                          [[]],
-                          {"fields": simple_fields, "limit": BATCH_SIZE,
-                           "offset": offset, "order": "id asc"})
-        if not batch:
-            break
-        all_records.extend(batch)
-        offset += len(batch)
-        print(f"   Descargadas {offset}/{total_all}...")
-
-    return all_records, available
+def fetch_guides(models, uid):
+    fields = [
+        "id", "name", "l10n_latam_document_number",
+        "l10n_ec_authorization_number", "l10n_ec_authorization_date",
+        "date_start", "date_end", "date",
+        "warehouse_id", "client_id", "partner_id",
+        "license_plate", "animal_qty_total",
+        "state", "line_ids",
+    ]
+    guides = batch_search_read(models, uid,
+                               "account.remission.guide",
+                               [("state", "=", "posted")], fields)
+    if not guides:
+        sys.exit("❌ Sin guías en estado 'posted'.")
+    return guides
 
 
-def get_from_stock_picking(models, uid):
-    """Fallback: extrae desde stock.picking si account.remission.guide no existe."""
-    available = discover_fields(models, uid, "stock.picking")
-    # Descubrir estado real en stock.picking
-    sp_total = odoo_call(models, uid, "stock.picking", "search_count", [[]])
-    print(f"   stock.picking total sin filtro: {sp_total}")
-    sp_domain = [("picking_type_code", "=", "outgoing")]
-    if sp_total > 0:
-        sp_sample = odoo_call(models, uid, "stock.picking", "search_read",
-                              [[]], {"fields": ["state"], "limit": 100})
-        sp_estados = list(set(r.get("state","") for r in sp_sample if r.get("state")))
-        for pref in ["done", "validated", "authorized", "confirmed"]:
-            if pref in sp_estados:
-                sp_domain.append(("state", "=", pref))
-                print(f"   stock.picking usando state='{pref}'")
-                break
-    domain = sp_domain
-    total = odoo_call(models, uid, "stock.picking", "search_count", [domain])
-    fields = [f for f in ["name", "id", "partner_id", "scheduled_date",
-                           "date_done", "carrier_id", "origin", "note",
-                           "move_line_ids", "move_ids"] if f in available]
-    all_records = []
-    offset = 0
-    while offset < total:
-        batch = odoo_call(models, uid, "stock.picking", "search_read",
-                          [domain], {"fields": fields, "limit": BATCH_SIZE, "offset": offset})
-        all_records.extend(batch)
-        offset += BATCH_SIZE
-        if not batch:
-            break
-    return all_records, available
+def fetch_guide_lines(models, uid, guide_ids):
+    fields = ["id", "guide_id", "picking_id", "stock_move_lines",
+              "reason_id", "animal_qty", "partner_id"]
+    lines = batch_search_read(models, uid,
+                              "account.remission.guide.line",
+                              [("guide_id", "in", guide_ids)], fields)
+    by_guide = {}
+    for ln in lines:
+        gid = m2o_id(ln["guide_id"])
+        by_guide.setdefault(gid, []).append(ln)
+    return by_guide
 
 
-# ─── FETCH PRODUCT LINES ─────────────────────────────────────────────────────
-
-def get_move_lines(models, uid, picking_ids):
-    """
-    Obtiene líneas de movimiento (stock.move.line) para una lista de picking_ids.
-    Retorna dict: {picking_id: [líneas]}
-    """
+def fetch_stock_moves(models, uid, picking_ids):
     if not picking_ids:
         return {}
+    # Descubrir campos disponibles (para no fallar si gross_quantity no existe)
+    try:
+        available = set(rpc(models, uid, "stock.move", "fields_get", [],
+                            {"attributes": ["type"]}).keys())
+    except Exception:
+        available = set()
 
-    available = discover_fields(models, uid, "stock.move.line")
-    want = ["picking_id", "product_id", "product_uom_id", "quantity",
-            "qty_done", "lot_id", "result_package_id",
-            "l10n_ec_gross_weight", "weight"]
-    fields = [f for f in want if f in available]
+    want = ["id", "picking_id", "product_id", "product_uom",
+            "description_picking", "product_uom_qty", "quantity",
+            "gross_quantity", "name", "cardboard", "additional"]
+    fields = [f for f in want if not available or f in available]
 
-    print(f"   Descargando líneas de producto para {len(picking_ids)} guías...")
-    lines = odoo_call(models, uid, "stock.move.line", "search_read",
-                      [[("picking_id", "in", picking_ids)]],
-                      {"fields": fields})
-
+    moves = batch_search_read(models, uid, "stock.move",
+                              [("picking_id", "in", list(picking_ids)),
+                               ("state", "=", "done")], fields)
     by_picking = {}
-    for line in lines:
-        pid = line["picking_id"][0] if isinstance(line["picking_id"], list) else line["picking_id"]
-        by_picking.setdefault(pid, []).append(line)
+    for mv in moves:
+        pid = m2o_id(mv.get("picking_id"))
+        if pid and pid not in by_picking:
+            by_picking[pid] = mv
     return by_picking
 
 
-def get_guide_lines(models, uid, guide_ids):
+def fetch_guide_stock_lines(models, uid, stock_line_ids):
     """
-    Intenta obtener líneas propias de la guía de remisión.
-    Prueba varios modelos: l10n_ec.remission.guide.line, account.remission.guide.line
+    Descarga account.remission.guide.stock.line y auto-descubre sus campos.
+    Estos son los campos donde viven tecnico, despacho, gavetas, plus.
     """
-    for line_model in ["l10n_ec.remission.guide.line", "account.remission.guide.line",
-                        "stock.move"]:
-        try:
-            available = discover_fields(models, uid, line_model)
-            if not available:
-                continue
-            # Buscar el campo que relaciona al guide
-            guide_field = None
-            for f in ["remission_guide_id", "guide_id", "l10n_ec_guide_id"]:
-                if f in available:
-                    guide_field = f
-                    break
-            if not guide_field:
-                continue
+    if not stock_line_ids:
+        return {}, {}
+    try:
+        fields_meta = rpc(models, uid,
+                          "account.remission.guide.stock.line",
+                          "fields_get", [],
+                          {"attributes": ["string", "type", "relation"]})
+    except Exception as e:
+        print(f"   ⚠️  account.remission.guide.stock.line no accesible: {e}")
+        return {}, {}
 
-            want = [guide_field, "product_id", "product_uom_id", "product_uom_qty",
-                    "quantity", "qty_done", "name", "product_uom",
-                    "l10n_ec_gross_weight", "x_cant_bruta"]
-            fields = [f for f in want if f in available]
+    print(f"\n   📋 account.remission.guide.stock.line — {len(fields_meta)} campos:")
+    for fn in sorted(fields_meta.keys()):
+        fm = fields_meta[fn]
+        print(f"      {fn:<40} {fm['type']:<12} {fm.get('string','')}")
 
-            lines = odoo_call(models, uid, line_model, "search_read",
-                              [[(guide_field, "in", guide_ids)]],
-                              {"fields": fields})
+    # Solo campos simples (no binarios ni one2many pesados)
+    exclude = {"binary", "html", "one2many", "many2many"}
+    fields  = [f for f, m in fields_meta.items() if m["type"] not in exclude]
 
-            by_guide = {}
-            for line in lines:
-                gid = line[guide_field]
-                if isinstance(gid, list):
-                    gid = gid[0]
-                by_guide.setdefault(gid, []).append(line)
+    try:
+        records = batch_read(models, uid,
+                             "account.remission.guide.stock.line",
+                             list(stock_line_ids), fields)
+        by_id = {r["id"]: r for r in records}
 
-            if lines:
-                print(f"   ✅ Líneas de producto obtenidas desde '{line_model}'")
-                return by_guide, line_model
-        except Exception:
-            continue
+        # Mostrar un ejemplo para diagnóstico
+        if records:
+            print(f"\n   Ejemplo guide.stock.line id={records[0]['id']}:")
+            for k, v in records[0].items():
+                if v is not False and v is not None and v != "" and v != []:
+                    print(f"      {k}: {repr(v)[:80]}")
 
-    return {}, None
-
-
-# ─── FIELD EXTRACTION ────────────────────────────────────────────────────────
-
-def extract_field(record, candidates, default=""):
-    """Extrae el primer campo disponible de una lista de candidatos."""
-    for field in candidates:
-        val = record.get(field)
-        if val is not False and val is not None and val != "":
-            return val
-    return default
+        return by_id, fields_meta
+    except Exception as e:
+        print(f"   ⚠️  Error leyendo guide.stock.line: {e}")
+        return {}, fields_meta
 
 
-def build_row(guide, product_line, available_fields):
-    """Construye una fila de 26 columnas para el Sheet."""
+def fetch_partners(models, uid, partner_ids):
+    if not partner_ids:
+        return {}
+    fields = [
+        "id", "name", "vat",
+        "parent_id", "parent_name",
+        "street", "city", "state_id",
+        "sector",   # punto de llegada personalizado TEXCUMAR
+        "tex_city",
+        "type", "function",
+    ]
+    records = batch_read(models, uid, "res.partner",
+                         list(set(partner_ids)), fields)
+    return {r["id"]: r for r in records}
 
-    def g(candidates):
-        return extract_field(guide, candidates)
+# ─── BUILD ROW ────────────────────────────────────────────────────────────────
 
-    def p(candidates):
-        return extract_field(product_line, candidates) if product_line else ""
+def build_row(guide, guide_line, stock_move, client_p, carrier_p,
+              guide_stock_line, stock_line_fields):
 
-    # ── Encabezado ──
-    numero           = safe(g(["name", "l10n_ec_name", "number"]))
-    autorizacion     = safe(g(["l10n_ec_authorization_number", "authorization_number",
-                                "l10n_latam_document_number"]))
-    fechaAutorizacion= fmt_date(g(["l10n_ec_authorization_date", "invoice_date",
-                                   "date_order", "date"]))
-    base             = safe(g(["location_dest_id", "warehouse_id", "origin_location",
-                                "location_id", "note", "origin"]))
-    codigoSCI        = safe(g(["l10n_ec_sci_code", "sci_code", "ref", "x_sci"]))
-    globalGAP        = safe(g(["l10n_ec_global_gap", "global_gap_number", "x_global_gap"]))
-    fechaInicio      = fmt_date(g(["scheduled_date", "date_order", "date"]))
-    fechaFin         = fmt_date(g(["date_deadline", "date_done"]))
-    destinatario     = safe(g(["partner_id", "dest_partner_id"]))
-    rucDestino       = safe(g(["l10n_ec_ruc_dest", "x_ruc_dest", "partner_vat"]))
-    nombreDest       = safe(g(["l10n_ec_dest_name", "dest_name", "x_nombre_dest"]))
-    destino          = safe(g(["l10n_ec_dest_address", "dest_address", "x_destino"]))
-    llegada          = safe(g(["l10n_ec_dest_point", "dest_point", "arrival_point",
-                                "x_llegada"]))
-    motivo           = safe(g(["l10n_ec_motive", "motive", "x_motivo", "origin"]))
-    transportista    = safe(g(["carrier_id", "l10n_ec_carrier_id", "x_transportista"]))
-    rucTransp        = safe(g(["l10n_ec_carrier_vat", "carrier_vat", "x_ruc_transp"]))
-    placa            = safe(g(["l10n_ec_plate", "plate", "x_plate", "x_placa"]))
-    tecnico          = safe(g(["l10n_ec_technician", "x_tecnico", "technician"]))
-    despacho         = safe(g(["l10n_ec_dispatch_type", "dispatch_type", "x_despacho"]))
+    # ── ENCABEZADO ────────────────────────────────────────────────────────
+    numero = safe(guide.get("l10n_latam_document_number") or guide.get("name", ""))
+    # Eliminar prefijo 'REM ' si viene del campo name
+    if numero.upper().startswith("REM "):
+        numero = numero[4:].strip()
 
-    # ── Producto (desde línea) ──
+    autorizacion      = safe(guide.get("l10n_ec_authorization_number", ""))
+    fechaAutorizacion = fmt_date(guide.get("l10n_ec_authorization_date")
+                                 or guide.get("date"))
+    base              = m2o_name(guide.get("warehouse_id"))
+    fechaInicio       = fmt_date(guide.get("date_start") or guide.get("date"))
+    fechaFin          = fmt_date(guide.get("date_end"))
+    placa             = safe(guide.get("license_plate", ""))
+    cantidad          = safe(guide.get("animal_qty_total", ""))
+    codigoSCI         = ""   # campo no existe en Odoo
+    globalGAP         = ""   # campo no existe en Odoo
+
+    # ── CLIENTE ───────────────────────────────────────────────────────────
+    if client_p:
+        parent_name  = safe(client_p.get("parent_name", ""))
+        own_name     = safe(client_p.get("name", ""))
+        destinatario = parent_name if parent_name else own_name
+        nombreDest   = own_name
+        rucDestino   = safe(client_p.get("vat", ""))
+        destino      = build_destino(client_p)
+        llegada      = m2o_name(client_p.get("sector")) or safe(client_p.get("street", ""))
+    else:
+        destinatario = m2o_name(guide.get("client_id"))
+        rucDestino   = ""
+        nombreDest   = ""
+        destino      = ""
+        llegada      = ""
+
+    # ── MOTIVO ────────────────────────────────────────────────────────────
+    motivo = m2o_name(guide_line.get("reason_id")) if guide_line else ""
+
+    # ── TRANSPORTISTA ─────────────────────────────────────────────────────
+    if carrier_p:
+        transportista = safe(carrier_p.get("name", ""))
+        rucTransp     = safe(carrier_p.get("vat", ""))
+    else:
+        transportista = m2o_name(guide.get("partner_id"))
+        rucTransp     = ""
+
+    # ── PRODUCTO (stock.move) ─────────────────────────────────────────────
     codProducto = ""
     unidad      = ""
     descripcion = ""
-    cantidad    = ""
     cantBruta   = ""
-    gavetas     = ""
-    plus        = ""
 
-    if product_line:
-        # Código de producto
-        prod = product_line.get("product_id")
-        if prod and prod is not False:
-            if isinstance(prod, list):
-                descripcion = safe(prod[1]) if len(prod) > 1 else ""
-                # default_code viene en otro campo
-                codProducto = safe(product_line.get("product_default_code", ""))
-                if not codProducto:
-                    codProducto = safe(product_line.get("default_code", ""))
-            else:
-                descripcion = safe(prod)
+    if stock_move:
+        product_display = m2o_name(stock_move.get("product_id"))
+        codProducto     = extract_code(product_display)
+        unidad          = m2o_name(stock_move.get("product_uom"))
+        descripcion     = safe(stock_move.get("description_picking", ""))
+        if not descripcion:
+            descripcion = strip_code(product_display) or safe(stock_move.get("name", ""))
+        cantBruta = safe(stock_move.get("gross_quantity", ""))
 
-        # Si hay campo explícito de descripcion
-        for df in ["name", "description", "product_name"]:
-            v = product_line.get(df)
-            if v and v is not False:
-                descripcion = safe(v)
-                break
+    # ── GUIDE STOCK LINE ──────────────────────────────────────────────────
+    # Si los campos de guide.stock.line están poblados los usa;
+    # si no, intenta desde stock_move (campos custom de TEXCUMAR)
+    def get_campo(candidates):
+        v = first_val(guide_stock_line, candidates)
+        if not v and stock_move:
+            v = first_val(stock_move, candidates)
+        return v
 
-        # Unidad
-        uom = product_line.get("product_uom_id") or product_line.get("product_uom")
-        if uom and uom is not False:
-            unidad = safe(uom)
-
-        # Cantidades
-        for qf in ["product_uom_qty", "quantity", "qty_done", "quantity_done"]:
-            v = product_line.get(qf)
-            if v and v is not False and v != 0:
-                cantidad = safe_num(v)
-                break
-
-        cantBruta = safe_num(
-            product_line.get("l10n_ec_gross_weight") or
-            product_line.get("gross_weight") or
-            product_line.get("x_cant_bruta") or
-            product_line.get("weight") or ""
-        )
-
-        gavetas = safe_num(
-            product_line.get("l10n_ec_containers") or
-            product_line.get("x_gavetas") or
-            product_line.get("number_of_packages") or ""
-        )
-        plus = safe_num(product_line.get("x_plus") or "")
+    tecnico  = get_campo(TECNICO_CANDIDATES)
+    despacho = get_campo(DESPACHO_CANDIDATES)
+    gavetas  = get_campo(GAVETAS_CANDIDATES)
+    plus     = get_campo(PLUS_CANDIDATES)
 
     return [
         numero, autorizacion, fechaAutorizacion, base,
@@ -424,120 +390,150 @@ def build_row(guide, product_line, available_fields):
         tecnico, despacho, gavetas, plus,
     ]
 
+# ─── GOOGLE SHEETS ────────────────────────────────────────────────────────────
 
-# ─── GOOGLE SHEETS ───────────────────────────────────────────────────────────
-
-def get_sheet():
-    creds_dict = json.loads(CREDS_JSON)
-    scopes = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive",
-    ]
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+def get_worksheet():
+    creds = Credentials.from_service_account_info(
+        json.loads(CREDS_JSON),
+        scopes=["https://spreadsheets.google.com/feeds",
+                "https://www.googleapis.com/auth/drive"]
+    )
     gc = gspread.authorize(creds)
     sh = gc.open_by_key(SHEET_ID)
-
-    # Obtener o crear pestaña Guias
     try:
         ws = sh.worksheet(SHEET_TAB)
     except gspread.exceptions.WorksheetNotFound:
-        ws = sh.add_worksheet(title=SHEET_TAB, rows=10000, cols=len(COLUMNS))
+        ws = sh.add_worksheet(title=SHEET_TAB, rows=12000, cols=len(COLUMNS))
         print(f"✅ Pestaña '{SHEET_TAB}' creada")
-
     return ws
 
-
-def write_to_sheet(ws, rows):
-    """Limpia la pestaña y escribe todos los datos de una vez."""
+def write_sheet(ws, rows):
     ws.clear()
     all_data = [COLUMNS] + rows
-    ws.update(all_data, value_input_option="RAW")
-    print(f"✅ {len(rows)} registros escritos en '{SHEET_TAB}'")
+    CHUNK = 3000
+    for i in range(0, len(all_data), CHUNK):
+        ws.update(all_data[i:i+CHUNK], f"A{i+1}", value_input_option="RAW")
+    print(f"✅ {len(rows)} filas escritas en '{SHEET_TAB}'")
 
-
-# ─── MAIN ────────────────────────────────────────────────────────────────────
+# ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 def main():
-    print("=" * 60)
-    print("TEXCUMAR — Sync Odoo → Google Sheets")
+    print("=" * 65)
+    print("TEXCUMAR — Sync Odoo → Google Sheets v3")
     print(f"Inicio: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 60)
+    print("=" * 65)
 
-    # 1. Conectar Odoo
-    uid, models = odoo_connect()
+    uid, models = connect_odoo()
 
-    # 2. Obtener guías
-    print("\n📥 Descargando guías de remisión...")
-    guide_records, available_fields = get_guide_records(models, uid)
-    print(f"   Total descargadas: {len(guide_records)}")
+    # 1. Guías
+    print("\n📥 1/6  Guías (state=posted)...")
+    guides = fetch_guides(models, uid)
+    guide_ids   = [g["id"] for g in guides]
+    client_ids  = [m2o_id(g.get("client_id"))  for g in guides]
+    carrier_ids = [m2o_id(g.get("partner_id")) for g in guides]
 
-    if not guide_records:
-        print("⚠️  Sin registros. Revisa el dominio de búsqueda o las credenciales.")
-        return
+    # 2. Líneas de guía
+    print("\n📥 2/6  Líneas de guía...")
+    lines_by_guide = fetch_guide_lines(models, uid, guide_ids)
+    picking_ids      = set()
+    stock_line_ids   = set()
+    for lines in lines_by_guide.values():
+        for ln in lines:
+            if ln.get("picking_id"):
+                picking_ids.add(m2o_id(ln["picking_id"]))
+            for slid in (ln.get("stock_move_lines") or []):
+                stock_line_ids.add(slid)
+    print(f"   {sum(len(v) for v in lines_by_guide.values())} líneas | "
+          f"{len(picking_ids)} pickings | {len(stock_line_ids)} stock.lines")
 
-    # 3. Obtener líneas de producto
-    print("\n📦 Descargando líneas de producto...")
-    guide_ids = [r["id"] for r in guide_records]
+    # 3. Stock moves
+    print("\n📥 3/6  stock.move (producto, unidad, cantBruta)...")
+    moves_by_picking = fetch_stock_moves(models, uid, picking_ids)
+    print(f"   {len(moves_by_picking)} movimientos")
 
-    # Intentar primero modelo de líneas de guía
-    lines_by_guide, line_model_used = get_guide_lines(models, uid, guide_ids)
+    # 4. Guide stock lines (tecnico, despacho, gavetas, plus)
+    print("\n📥 4/6  account.remission.guide.stock.line...")
+    stock_lines_by_id, stock_line_fields = fetch_guide_stock_lines(
+        models, uid, stock_line_ids)
+    print(f"   {len(stock_lines_by_id)} registros")
 
-    # Si no funcionó, intentar via stock.move.line con picking_id
-    if not lines_by_guide:
-        print("   Probando via stock.move.line...")
-        picking_ids = []
-        for r in guide_records:
-            pid = r.get("picking_id")
-            if pid and pid is not False:
-                if isinstance(pid, list):
-                    picking_ids.append(pid[0])
-                else:
-                    picking_ids.append(pid)
-            # Algunos modelos tienen move_ids directamente
-            mid = r.get("move_ids")
-            if mid and isinstance(mid, list):
-                picking_ids.extend(mid)
+    # 5. Partners
+    print("\n📥 5/6  Partners (clientes + transportistas)...")
+    all_pids = list(set(filter(None, client_ids + carrier_ids)))
+    partners = fetch_partners(models, uid, all_pids)
+    print(f"   {len(partners)} partners")
 
-        if picking_ids:
-            move_lines = get_move_lines(models, uid, list(set(picking_ids)))
-            # Remap por guide_id usando picking_id del record
-            for r in guide_records:
-                pid = r.get("picking_id")
-                if pid:
-                    pid = pid[0] if isinstance(pid, list) else pid
-                    if pid in move_lines:
-                        lines_by_guide[r["id"]] = move_lines[pid]
-        else:
-            print("   ⚠️  No se encontró campo picking_id ni move_ids en las guías")
-            print("   Los campos de producto aparecerán vacíos para registros nuevos")
+    # 6. Construir filas
+    print("\n🔨 6/6  Construyendo filas...")
+    rows = []
+    stat = {"no_move": 0, "no_client": 0, "no_stockline": 0}
 
-    # Estadísticas
-    with_product = sum(1 for gid in [r["id"] for r in guide_records] if gid in lines_by_guide)
-    print(f"   Guías con datos de producto: {with_product}/{len(guide_records)}")
+    for guide in guides:
+        gid         = guide["id"]
+        guide_lines = lines_by_guide.get(gid, [])
+        guide_line  = guide_lines[0] if guide_lines else None
 
-    # 4. Construir filas
-    print("\n🔨 Construyendo filas...")
-    sheet_rows = []
-    for guide in guide_records:
-        gid = guide["id"]
-        # Tomar solo la primera línea de producto si hay varias
-        product_lines = lines_by_guide.get(gid, [])
-        product_line = product_lines[0] if product_lines else None
-        row = build_row(guide, product_line, available_fields)
-        sheet_rows.append(row)
+        # stock.move via picking
+        stock_move = None
+        if guide_line and guide_line.get("picking_id"):
+            stock_move = moves_by_picking.get(m2o_id(guide_line["picking_id"]))
+        if not stock_move:
+            stat["no_move"] += 1
 
-    # 5. Escribir al Sheet
-    print(f"\n📤 Escribiendo {len(sheet_rows)} registros al Sheet...")
-    ws = get_sheet()
-    write_to_sheet(ws, sheet_rows)
+        # guide.stock.line
+        gsl = None
+        if guide_line and guide_line.get("stock_move_lines"):
+            gsl = stock_lines_by_id.get(guide_line["stock_move_lines"][0])
+        if not gsl:
+            stat["no_stockline"] += 1
 
-    print("\n" + "=" * 60)
-    print(f"✅ Sync completado: {len(sheet_rows)} guías")
-    print(f"   Con producto: {with_product} | Sin producto: {len(sheet_rows) - with_product}")
-    if line_model_used:
-        print(f"   Fuente de líneas: {line_model_used}")
-    print(f"Fin: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 60)
+        # partners
+        client_p  = partners.get(m2o_id(guide.get("client_id")))
+        carrier_p = partners.get(m2o_id(guide.get("partner_id")))
+        if not client_p:
+            stat["no_client"] += 1
+
+        rows.append(build_row(guide, guide_line, stock_move,
+                               client_p, carrier_p, gsl, stock_line_fields))
+
+    # Verificar candidatos en stock.line
+    if stock_line_fields:
+        sl_keys = set(stock_line_fields.keys())
+        print(f"\n   📋 Verificación campos en guide.stock.line:")
+        for campo, cands in [("tecnico",  TECNICO_CANDIDATES),
+                              ("despacho", DESPACHO_CANDIDATES),
+                              ("gavetas",  GAVETAS_CANDIDATES),
+                              ("plus",     PLUS_CANDIDATES)]:
+            found = [c for c in cands if c in sl_keys]
+            status = f"✅ {found}" if found else "❌ NINGUNO — campo pendiente de mapear"
+            print(f"      {campo:<10}: {status}")
+
+    # Escribir
+    print(f"\n📤 Escribiendo {len(rows)} filas al Sheet...")
+    ws = get_worksheet()
+    write_sheet(ws, rows)
+
+    # Resumen de cobertura
+    print("\n" + "=" * 65)
+    print(f"✅ SYNC COMPLETADO — {len(rows)} registros")
+    print(f"   Sin stock.move:  {stat['no_move']}")
+    print(f"   Sin client_id:   {stat['no_client']}")
+    print(f"   Sin stock.line:  {stat['no_stockline']}")
+    print(f"\n   Cobertura por campo:")
+    for col in ["numero", "autorizacion", "base", "destinatario",
+                "rucDestino", "nombreDest", "destino", "llegada",
+                "motivo", "transportista", "rucTransp", "placa",
+                "codProducto", "unidad", "descripcion",
+                "cantidad", "cantBruta",
+                "tecnico", "despacho", "gavetas", "plus"]:
+        idx = COLUMNS.index(col)
+        n   = sum(1 for r in rows if r[idx] and str(r[idx]).strip())
+        pct = int(n / len(rows) * 100) if rows else 0
+        ico = "✅" if pct >= 80 else ("⚠️ " if pct >= 10 else "❌")
+        print(f"   {ico} {col:<18}: {n:>6}/{len(rows)} ({pct}%)")
+
+    print(f"\nFin: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 65)
 
 
 if __name__ == "__main__":
