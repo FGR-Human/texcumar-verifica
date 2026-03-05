@@ -318,7 +318,7 @@ export default function TexcumarVerifica() {
         {estado==="found" && resultado && (
           <div style={{animation:"fadeIn .45s ease",background:"rgba(16,74,48,0.2)",border:"1px solid rgba(45,190,122,0.35)",borderRadius:16,overflow:"hidden"}}>
             {/* Banner */}
-            <div style={{background:"rgba(22,38,96,0.96)",}}>
+            <div style={{background:"linear-gradient(90deg, rgba(22,38,96,0.96), rgba(22,38,96,0.88))",padding:"18px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid rgba(240,181,0,0.35)",flexWrap:"wrap",gap:12}}>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
                 <CheckIcon/>
                 <div>
@@ -326,7 +326,7 @@ export default function TexcumarVerifica() {
                   <div style={{fontSize:12,color:"#FFFFFF",marginTop:2}}>Esta guía fue emitida oficialmente por Texcumar S.A.</div>
                 </div>
               </div>
-              <div style={{background:C.greenMuted,border:"1px solid rgba(240,181,0,0.35)",borderRadius:20,padding:"5px 16px",fontSize:11,color:C.green,letterSpacing:"0.1em",fontWeight:700}}>
+              <div style={{background:"rgba(240,181,0,0.22)",border:"1px solid rgba(240,181,0,0.55)",borderRadius:20,padding:"5px 16px",fontSize:11,color:C.green,letterSpacing:"0.1em",fontWeight:700}}>
                 VÁLIDA ✓
               </div>
             </div>
