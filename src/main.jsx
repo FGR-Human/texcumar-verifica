@@ -310,7 +310,7 @@ export default function TexcumarVerifica() {
             </button>
           </div>
           <div style={{marginTop:12,fontSize:12,color:C.textLow}}>
-            Ingrese los últimos dígitos o el número completo tal como aparece en su guía (ej: 58498 o 001-001-000058498)
+            Ingrese el número completo tal como aparece en su guía (ej: 58498 o 001-001-000058498)
           </div>
         </div>
 
@@ -318,12 +318,12 @@ export default function TexcumarVerifica() {
         {estado==="found" && resultado && (
           <div style={{animation:"fadeIn .45s ease",background:"rgba(16,74,48,0.2)",border:"1px solid rgba(45,190,122,0.35)",borderRadius:16,overflow:"hidden"}}>
             {/* Banner */}
-            <div style={{background:"linear-gradient(90deg,rgba(240,181,0,0.14),rgba(30,155,94,0.08))",padding:"18px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid rgba(240,181,0,0.14)",flexWrap:"wrap",gap:12}}>
+            <div style={{background:"rgba(22,38,96,0.96)",}}>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
                 <CheckIcon/>
                 <div>
                   <div style={{fontSize:14,fontWeight:700,color:C.green,letterSpacing:"0.04em"}}>✓ GUÍA VERIFICADA — DOCUMENTO AUTÉNTICO</div>
-                  <div style={{fontSize:12,color:"rgba(22,38,96,0.70)",marginTop:2}}>Esta guía fue emitida oficialmente por Texcumar S.A.</div>
+                  <div style={{fontSize:12,color:"#FFFFFF",marginTop:2}}>Esta guía fue emitida oficialmente por Texcumar S.A.</div>
                 </div>
               </div>
               <div style={{background:C.greenMuted,border:"1px solid rgba(240,181,0,0.35)",borderRadius:20,padding:"5px 16px",fontSize:11,color:C.green,letterSpacing:"0.1em",fontWeight:700}}>
