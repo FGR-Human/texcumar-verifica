@@ -12,6 +12,8 @@ const DB = {
     autorizacion: "2701202606099144966300120010010000584983121521413",
     fechaAutorizacion: "2026-01-27",
     base: "BASE MAD. 1",
+    codigoSCI: "HT-899",
+    globalGAP: "GGN 4052852001991",
     fechaInicio: "27/01/2026",
     fechaFin: "27/01/2026",
     destinatario: "OPUSCULO DEL MAR S.A. (OPUMARSA)",
@@ -29,12 +31,20 @@ const DB = {
     descripcion: "NAUPLIOS LITOPENAEUS VANNAMEI CODIFICADOS",
     cantidad: "9.000,00",
     cantBruta: "12.000,00",
+    tecnico: "WALTER SUAREZ - 0919292623",
+    despacho: "Kavetas",
+    gavetas: "22",
+    plus: "25",
+    salinidad: "30",
+    temperatura: "31,0°C",
   },
   "001-001-000058497": {
     numero: "001-001-000058497",
     autorizacion: "2701202606099144966300120010010000584973121521418",
     fechaAutorizacion: "2026-01-27",
     base: "BASE MAD. 1",
+    codigoSCI: "HT-899",
+    globalGAP: "GGN 4052852001991",
     fechaInicio: "27/01/2026",
     fechaFin: "27/01/2026",
     destinatario: "AQUASALT S.A.",
@@ -52,12 +62,20 @@ const DB = {
     descripcion: "NAUPLIOS LITOPENAEUS VANNAMEI CODIFICADOS",
     cantidad: "30.000,00",
     cantBruta: "42.858,00",
+    tecnico: "ORLANDO ANGEL - 0922170774",
+    despacho: "Cartons",
+    gavetas: "155",
+    plus: "30",
+    salinidad: "30",
+    temperatura: "31,5°C",
   },
   "001-002-000014385": {
     numero: "001-002-000014385",
     autorizacion: "2701202606099144966300120010020000143853121521415",
     fechaAutorizacion: "2026-01-27",
     base: "BASE MAD. 2",
+    codigoSCI: "HT-3528",
+    globalGAP: "GGN 4052852001991",
     fechaInicio: "27/01/2026",
     fechaFin: "28/01/2026",
     destinatario: "FISHERMAN S.A.",
@@ -75,12 +93,20 @@ const DB = {
     descripcion: "NAUPLIOS LITOPENAEUS VANNAMEI CODIFICADOS",
     cantidad: "26.000,00",
     cantBruta: "40.000,00",
+    tecnico: "JONNY ORRALA - 0909768772",
+    despacho: "Cartones",
+    gavetas: "150",
+    plus: "35",
+    salinidad: "29",
+    temperatura: "32,0°C",
   },
   "001-003-000000803": {
     numero: "001-003-000000803",
     autorizacion: "2701202606099144966300120010030000008033121521414",
     fechaAutorizacion: "2026-01-27",
     base: "BASE MAD. 3",
+    codigoSCI: "HT-104345",
+    globalGAP: "GGN 4052852001991",
     fechaInicio: "27/01/2026",
     fechaFin: "27/01/2026",
     destinatario: "ORRALA AQUINO YORDY JOSE",
@@ -98,12 +124,20 @@ const DB = {
     descripcion: "NAUPLIOS LITOPENAEUS VANNAMEI CODIFICADOS 3",
     cantidad: "22.000,00",
     cantBruta: "29.333,33",
+    tecnico: "YORDY ORRALA AQUINO - 0910678424",
+    despacho: "Kavetas",
+    gavetas: "52",
+    plus: "25",
+    salinidad: "31.5",
+    temperatura: "31,0°C",
   },
   "001-005-000005176": {
     numero: "001-005-000005176",
     autorizacion: "2701202606099144966300120010050000051763121521414",
     fechaAutorizacion: "2026-01-27",
     base: "BASE MAD. 4",
+    codigoSCI: "HT-65269",
+    globalGAP: "GGN 4052852001991",
     fechaInicio: "27/01/2026",
     fechaFin: "27/01/2026",
     destinatario: "OMARSA S.A.",
@@ -121,13 +155,35 @@ const DB = {
     descripcion: "NAUPLIOS LITOPENAEUS VANNAMEI CODIFICADOS 4",
     cantidad: "15.000,00",
     cantBruta: "20.000,00",
+    tecnico: "CARLOS ESCOBAR RODRIGUEZ - 0922588116",
+    despacho: "Cartons",
+    gavetas: "74",
+    plus: "25",
+    salinidad: "31.5",
+    temperatura: "30,0°C",
   },
+};
+
+// ─── PALETA TEXCUMAR ─────────────────────────────────────────────────────────
+// Basada en texcumar.com: navy oscuro + verde corporativo + blanco limpio
+const C = {
+  bg:        "#0B1526",
+  bgCard:    "rgba(255,255,255,0.03)",
+  border:    "rgba(255,255,255,0.07)",
+  borderAct: "rgba(45,190,122,0.5)",
+  green:     "#2DBE7A",
+  greenDark: "#1E9B5E",
+  greenMuted:"rgba(45,190,122,0.15)",
+  textHi:    "#f0fdf4",
+  textMid:   "#94a3b8",
+  textLow:   "#334155",
+  mono:      "'Courier New', monospace",
 };
 
 const CheckIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" style={{width:22,height:22}}>
-    <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z" fill="rgba(52,211,153,0.15)" stroke="#34d399" strokeWidth="1.5"/>
-    <path d="M9 12l2 2 4-4" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z" fill="rgba(45,190,122,0.15)" stroke="#2DBE7A" strokeWidth="1.5"/>
+    <path d="M9 12l2 2 4-4" stroke="#2DBE7A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
 
@@ -162,8 +218,13 @@ export default function TexcumarVerifica() {
     try {
       const res = await fetch(`${API_URL}?numero=${encodeURIComponent(guia.trim())}`);
       const data = await res.json();
-      if (data && data.found && data.guia) {
-        setResultado(data.guia);
+      // BUG FIX: soporta ambas variantes de respuesta de la API
+      // Apps Script retorna {encontrada: true, guia: {...}}
+      // también soporta {found: true, guia: {...}} por retrocompatibilidad
+      const apiFound = data && (data.encontrada === true || data.found === true);
+      const apiGuia  = data && (data.guia || data.data || data.result);
+      if (apiFound && apiGuia) {
+        setResultado(apiGuia);
         setEstado("found");
       } else {
         const match = Object.keys(DB).find(k => {
@@ -186,21 +247,21 @@ export default function TexcumarVerifica() {
   const reset = () => { setGuia(""); setResultado(null); setEstado("idle"); };
 
   return (
-    <div style={{minHeight:"100vh", background:"#040d18", color:"#e2e8f0", fontFamily:"'Segoe UI', system-ui, sans-serif", fontSize:15}}>
+    <div style={{minHeight:"100vh", background:C.bg, color:C.textMid, fontFamily:"'Segoe UI', system-ui, sans-serif", fontSize:15}}>
 
-      {/* Ocean texture overlay */}
-      <div style={{position:"fixed",inset:0,backgroundImage:"radial-gradient(ellipse 80% 50% at 50% -20%, rgba(6,78,120,0.35) 0%, transparent 60%)",pointerEvents:"none",zIndex:0}}/>
-      <div style={{position:"fixed",inset:0,backgroundImage:"linear-gradient(rgba(14,165,233,0.025) 1px, transparent 1px),linear-gradient(90deg, rgba(14,165,233,0.025) 1px, transparent 1px)",backgroundSize:"48px 48px",pointerEvents:"none",zIndex:0}}/>
+      {/* Overlay sutil - textura verde */}
+      <div style={{position:"fixed",inset:0,backgroundImage:"radial-gradient(ellipse 80% 50% at 50% -20%, rgba(30,155,94,0.18) 0%, transparent 60%)",pointerEvents:"none",zIndex:0}}/>
+      <div style={{position:"fixed",inset:0,backgroundImage:"linear-gradient(rgba(45,190,122,0.018) 1px, transparent 1px),linear-gradient(90deg, rgba(45,190,122,0.018) 1px, transparent 1px)",backgroundSize:"48px 48px",pointerEvents:"none",zIndex:0}}/>
 
       {/* HEADER */}
-      <header style={{position:"sticky",top:0,zIndex:100,borderBottom:"1px solid rgba(14,165,233,0.15)",backdropFilter:"blur(16px)",background:"rgba(4,13,24,0.85)",padding:"14px 32px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <header style={{position:"sticky",top:0,zIndex:100,borderBottom:`1px solid ${C.border}`,backdropFilter:"blur(16px)",background:"rgba(11,21,38,0.92)",padding:"14px 32px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div style={{display:"flex",alignItems:"center",gap:14}}>
           <div>
             <img src={`data:image/png;base64,${LOGO_HZ}`} alt="Texcumar" style={{height:28,objectFit:"contain",filter:"brightness(0) invert(1)"}}/>
-            <div style={{fontSize:10,color:"#38bdf8",letterSpacing:"0.18em",textTransform:"uppercase",marginTop:1}}>Portal Oficial de Verificación de Guías</div>
+            <div style={{fontSize:10,color:C.green,letterSpacing:"0.18em",textTransform:"uppercase",marginTop:1}}>Portal Oficial de Verificación de Guías</div>
           </div>
         </div>
-        <div style={{fontSize:11,color:"#38bdf8",border:"1px solid rgba(56,189,248,0.25)",borderRadius:20,padding:"5px 14px",letterSpacing:"0.1em",textTransform:"uppercase"}}>
+        <div style={{fontSize:11,color:C.green,border:"1px solid rgba(45,190,122,0.3)",borderRadius:20,padding:"5px 14px",letterSpacing:"0.1em",textTransform:"uppercase"}}>
           R.U.C: 0991449663001
         </div>
       </header>
@@ -209,21 +270,21 @@ export default function TexcumarVerifica() {
 
         {/* HERO */}
         <div style={{textAlign:"center",marginBottom:48}}>
-          <div style={{display:"inline-flex",alignItems:"center",gap:8,fontSize:11,color:"#38bdf8",letterSpacing:"0.18em",textTransform:"uppercase",border:"1px solid rgba(56,189,248,0.25)",borderRadius:30,padding:"6px 18px",marginBottom:22}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:8,fontSize:11,color:C.green,letterSpacing:"0.18em",textTransform:"uppercase",border:"1px solid rgba(45,190,122,0.3)",borderRadius:30,padding:"6px 18px",marginBottom:22}}>
             <CheckIcon/> Sistema Oficial de Verificación
           </div>
-          <h1 style={{fontSize:"clamp(24px,4vw,38px)",fontWeight:300,lineHeight:1.25,margin:"0 0 16px",color:"#f0f9ff",letterSpacing:"-0.02em"}}>
+          <h1 style={{fontSize:"clamp(24px,4vw,38px)",fontWeight:300,lineHeight:1.25,margin:"0 0 16px",color:C.textHi,letterSpacing:"-0.02em"}}>
             Verifique la autenticidad de su<br/>
-            <span style={{fontWeight:700,color:"#38bdf8"}}>Guía de Remisión Texcumar</span>
+            <span style={{fontWeight:700,color:C.green}}>Guía de Remisión Texcumar</span>
           </h1>
-          <p style={{color:"#64748b",fontSize:15,maxWidth:500,margin:"0 auto",lineHeight:1.7}}>
-            Ingrese el número de guía impreso en su documento para confirmar que fue emitido oficialmente por <strong style={{color:"#94a3b8"}}>Texcumar S.A.</strong>
+          <p style={{color:C.textMid,fontSize:15,maxWidth:500,margin:"0 auto",lineHeight:1.7}}>
+            Ingrese el número de guía impreso en su documento para confirmar que fue emitido oficialmente por <strong style={{color:C.textHi}}>Texcumar S.A.</strong>
           </p>
         </div>
 
-        {/* SEARCH */}
-        <div style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${focused?"rgba(56,189,248,0.45)":"rgba(255,255,255,0.07)"}`,borderRadius:16,padding:"28px 32px",marginBottom:28,transition:"border-color .25s",boxShadow:focused?"0 0 50px rgba(56,189,248,0.06)":"none"}}>
-          <label style={{display:"block",fontSize:11,letterSpacing:"0.15em",color:"#38bdf8",textTransform:"uppercase",marginBottom:12}}>
+        {/* BUSCADOR */}
+        <div style={{background:C.bgCard,border:`1px solid ${focused ? C.borderAct : C.border}`,borderRadius:16,padding:"28px 32px",marginBottom:28,transition:"border-color .25s",boxShadow:focused?"0 0 50px rgba(45,190,122,0.08)":"none"}}>
+          <label style={{display:"block",fontSize:11,letterSpacing:"0.15em",color:C.green,textTransform:"uppercase",marginBottom:12}}>
             Número de Guía de Remisión
           </label>
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
@@ -234,12 +295,12 @@ export default function TexcumarVerifica() {
               onBlur={()=>setFocused(false)}
               onKeyDown={e=>e.key==="Enter"&&verificar()}
               placeholder="Ej: 58498 o 001-001-000058498"
-              style={{flex:1,minWidth:220,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"13px 18px",fontSize:17,color:"#e2e8f0",fontFamily:"'Courier New',monospace",letterSpacing:"0.04em",outline:"none"}}
+              style={{flex:1,minWidth:220,background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,padding:"13px 18px",fontSize:17,color:C.textHi,fontFamily:C.mono,letterSpacing:"0.04em",outline:"none"}}
             />
             <button
               onClick={verificar}
               disabled={estado==="loading"||!guia.trim()}
-              style={{background:estado==="loading"?"rgba(14,165,233,0.3)":"linear-gradient(135deg,#0ea5e9,#0369a1)",border:"none",borderRadius:10,padding:"13px 28px",color:"white",fontWeight:700,fontSize:13,letterSpacing:"0.08em",cursor:estado==="loading"||!guia.trim()?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:8,whiteSpace:"nowrap",boxShadow:"0 4px 24px rgba(14,165,233,0.3)",transition:"all .2s"}}
+              style={{background:estado==="loading"?C.greenMuted:`linear-gradient(135deg,${C.green},${C.greenDark})`,border:"none",borderRadius:10,padding:"13px 28px",color:"white",fontWeight:700,fontSize:13,letterSpacing:"0.08em",cursor:estado==="loading"||!guia.trim()?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:8,whiteSpace:"nowrap",boxShadow:"0 4px 24px rgba(45,190,122,0.25)",transition:"all .2s"}}
             >
               {estado==="loading" ? (
                 <><span style={{width:14,height:14,border:"2px solid rgba(255,255,255,0.3)",borderTopColor:"white",borderRadius:"50%",display:"inline-block",animation:"spin .8s linear infinite"}}/> Verificando...</>
@@ -248,46 +309,44 @@ export default function TexcumarVerifica() {
               )}
             </button>
           </div>
-          <div style={{marginTop:12,fontSize:12,color:"#334155"}}>
+          <div style={{marginTop:12,fontSize:12,color:C.textLow}}>
             Ingrese los últimos dígitos o el número completo tal como aparece en su guía (ej: 58498 o 001-001-000058498)
           </div>
         </div>
 
         {/* RESULTADO VÁLIDO */}
         {estado==="found" && resultado && (
-          <div style={{animation:"fadeIn .45s ease",background:"rgba(6,78,59,0.2)",border:"1px solid rgba(52,211,153,0.3)",borderRadius:16,overflow:"hidden"}}>
+          <div style={{animation:"fadeIn .45s ease",background:"rgba(16,74,48,0.2)",border:"1px solid rgba(45,190,122,0.35)",borderRadius:16,overflow:"hidden"}}>
             {/* Banner */}
-            <div style={{background:"linear-gradient(90deg,rgba(52,211,153,0.2),rgba(16,185,129,0.1))",padding:"18px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid rgba(52,211,153,0.15)",flexWrap:"wrap",gap:12}}>
+            <div style={{background:"linear-gradient(90deg,rgba(45,190,122,0.15),rgba(30,155,94,0.08))",padding:"18px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid rgba(45,190,122,0.15)",flexWrap:"wrap",gap:12}}>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
                 <CheckIcon/>
                 <div>
-                  <div style={{fontSize:14,fontWeight:700,color:"#6ee7b7",letterSpacing:"0.04em"}}>✓ GUÍA VERIFICADA — DOCUMENTO AUTÉNTICO</div>
-                  <div style={{fontSize:12,color:"#34d399",marginTop:2}}>Esta guía fue emitida oficialmente por Texcumar S.A.</div>
+                  <div style={{fontSize:14,fontWeight:700,color:C.green,letterSpacing:"0.04em"}}>✓ GUÍA VERIFICADA — DOCUMENTO AUTÉNTICO</div>
+                  <div style={{fontSize:12,color:"#86efac",marginTop:2}}>Esta guía fue emitida oficialmente por Texcumar S.A.</div>
                 </div>
               </div>
-              <div style={{background:"rgba(52,211,153,0.15)",border:"1px solid rgba(52,211,153,0.4)",borderRadius:20,padding:"5px 16px",fontSize:11,color:"#6ee7b7",letterSpacing:"0.1em",fontWeight:700}}>
+              <div style={{background:C.greenMuted,border:"1px solid rgba(45,190,122,0.4)",borderRadius:20,padding:"5px 16px",fontSize:11,color:C.green,letterSpacing:"0.1em",fontWeight:700}}>
                 VÁLIDA ✓
               </div>
             </div>
 
             <div style={{padding:"28px 28px 8px"}}>
-              <div style={{fontSize:11,letterSpacing:"0.15em",color:"#38bdf8",textTransform:"uppercase",marginBottom:20,paddingBottom:12,borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+              <div style={{fontSize:11,letterSpacing:"0.15em",color:C.green,textTransform:"uppercase",marginBottom:20,paddingBottom:12,borderBottom:`1px solid ${C.border}`}}>
                 Datos Oficiales del Documento
               </div>
-
-              {/* Sección encabezado */}
               <Section title="Identificación">
                 <Row label="N° de Guía" value={resultado.numero} mono/>
                 <Row label="N° Autorización SRI" value={resultado.autorizacion} mono small/>
                 <Row label="Fecha Autorización" value={resultado.fechaAutorizacion}/>
                 <Row label="Base de Maduración" value={resultado.base}/>
+                <Row label="Código SCI" value={resultado.codigoSCI} mono/>
+                <Row label="GLOBAL GAP" value={resultado.globalGAP} mono/>
               </Section>
-
               <Section title="Período de Transporte">
                 <Row label="Fecha Inicio" value={resultado.fechaInicio}/>
                 <Row label="Fecha Fin" value={resultado.fechaFin}/>
               </Section>
-
               <Section title="Destinatario">
                 <Row label="Razón Social" value={resultado.destinatario} full/>
                 <Row label="R.U.C / C.I." value={resultado.rucDestino} mono/>
@@ -296,14 +355,12 @@ export default function TexcumarVerifica() {
                 <Row label="Punto de Llegada" value={resultado.llegada} full/>
                 <Row label="Motivo" value={resultado.motivo}/>
               </Section>
-
               <Section title="Transportista">
                 <Row label="Nombres / Razón Social" value={resultado.transportista} full/>
                 <Row label="R.U.C / C.I." value={resultado.rucTransp} mono/>
                 <Row label="Placa Camión" value={resultado.placa} mono/>
                 <Row label="Punto de Partida" value={resultado.partida} full/>
               </Section>
-
               <Section title="Producto">
                 <Row label="Código Principal" value={resultado.codProducto} mono/>
                 <Row label="Unidad" value={resultado.unidad}/>
@@ -311,15 +368,21 @@ export default function TexcumarVerifica() {
                 <Row label="Cantidad" value={resultado.cantidad}/>
                 <Row label="Cantidad Bruta" value={resultado.cantBruta}/>
               </Section>
-
-
+              <Section title="Información Adicional">
+                <Row label="Técnico del Cliente" value={resultado.tecnico} full/>
+                <Row label="Forma de Despacho" value={resultado.despacho}/>
+                <Row label="N° Gavetas/Cartones" value={resultado.gavetas}/>
+                <Row label="Plus" value={resultado.plus}/>
+                <Row label="Salinidad" value={`${resultado.salinidad} ppt`}/>
+                <Row label="Temperatura" value={resultado.temperatura}/>
+              </Section>
             </div>
 
-            <div style={{padding:"16px 28px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:"1px solid rgba(255,255,255,0.05)",marginTop:8}}>
-              <span style={{fontSize:12,color:"#334155"}}>
+            <div style={{padding:"16px 28px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.border}`,marginTop:8}}>
+              <span style={{fontSize:12,color:C.textLow}}>
                 Verificado el {new Date().toLocaleDateString("es-EC",{day:"2-digit",month:"long",year:"numeric"})}
               </span>
-              <button onClick={reset} style={{background:"transparent",border:"1px solid rgba(56,189,248,0.3)",borderRadius:8,padding:"7px 18px",color:"#38bdf8",fontSize:12,cursor:"pointer",letterSpacing:"0.07em"}}>
+              <button onClick={reset} style={{background:"transparent",border:"1px solid rgba(45,190,122,0.3)",borderRadius:8,padding:"7px 18px",color:C.green,fontSize:12,cursor:"pointer",letterSpacing:"0.07em"}}>
                 ← Nueva consulta
               </button>
             </div>
@@ -335,10 +398,10 @@ export default function TexcumarVerifica() {
                 <div style={{fontSize:15,fontWeight:700,color:"#fca5a5",marginBottom:10}}>
                   GUÍA NO ENCONTRADA EN EL SISTEMA OFICIAL
                 </div>
-                <p style={{color:"#94a3b8",fontSize:14,lineHeight:1.7,margin:"0 0 16px"}}>
-                  El número <code style={{fontFamily:"monospace",color:"#fca5a5",background:"rgba(248,113,113,0.1)",padding:"2px 8px",borderRadius:4}}>{guia.trim()}</code> no corresponde a ninguna guía de remisión registrada en Texcumar S.A.
+                <p style={{color:C.textMid,fontSize:14,lineHeight:1.7,margin:"0 0 16px"}}>
+                  El número <code style={{fontFamily:"monospace",color:"#fca5a5",background:"rgba(248,113,113,0.1)",padding:"2px 8px",borderRadius:4}}>{guia.trim()}</code> no corresponde a ninguna guía registrada en Texcumar S.A.
                 </p>
-                <div style={{fontSize:13,color:"#64748b",lineHeight:2}}>
+                <div style={{fontSize:13,color:C.textMid,lineHeight:2}}>
                   Esto puede indicar que:<br/>
                   • El documento podría ser <strong style={{color:"#fca5a5"}}>una falsificación</strong><br/>
                   • El número fue ingresado con un error tipográfico<br/>
@@ -346,14 +409,14 @@ export default function TexcumarVerifica() {
                 </div>
                 <div style={{marginTop:20,padding:"16px 20px",background:"rgba(248,113,113,0.08)",borderRadius:10,border:"1px solid rgba(248,113,113,0.2)"}}>
                   <div style={{fontSize:11,color:"#fca5a5",fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>¿Sospecha de falsificación?</div>
-                  <div style={{fontSize:13,color:"#94a3b8"}}>
-                    Contáctenos de inmediato: <strong style={{color:"#7dd3fc"}}>+593 98 085 9115</strong> · <strong style={{color:"#7dd3fc"}}>facturaciontexcumar@texcumar.com</strong>
+                  <div style={{fontSize:13,color:C.textMid}}>
+                    Contáctenos de inmediato: <strong style={{color:C.green}}>+593 98 085 9115</strong> · <strong style={{color:C.green}}>facturaciontexcumar@texcumar.com</strong>
                   </div>
                 </div>
               </div>
             </div>
             <div style={{marginTop:20,textAlign:"right"}}>
-              <button onClick={reset} style={{background:"transparent",border:"1px solid rgba(56,189,248,0.3)",borderRadius:8,padding:"8px 18px",color:"#38bdf8",fontSize:12,cursor:"pointer",letterSpacing:"0.07em"}}>
+              <button onClick={reset} style={{background:"transparent",border:"1px solid rgba(45,190,122,0.3)",borderRadius:8,padding:"8px 18px",color:C.green,fontSize:12,cursor:"pointer",letterSpacing:"0.07em"}}>
                 ← Intentar de nuevo
               </button>
             </div>
@@ -362,29 +425,24 @@ export default function TexcumarVerifica() {
 
         {/* CARDS INFO */}
         {estado==="idle" && (
-          <>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:16,marginTop:8}}>
-              {[
-                {emoji:"🔐",t:"Datos únicos",d:"Cada guía tiene información exclusiva registrada en nuestra base de datos oficial"},
-                {emoji:"⚡",t:"Verificación inmediata",d:"Resultado en segundos desde cualquier dispositivo con internet"},
-                {emoji:"🛡️",t:"Base de datos segura",d:"Los datos oficiales solo los conoce Texcumar, imposibles de replicar"},
-              ].map((c,i)=>(
-                <div key={i} style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:12,padding:"22px 20px",textAlign:"center"}}>
-                  <div style={{fontSize:30,marginBottom:10}}>{c.emoji}</div>
-                  <div style={{fontSize:13,fontWeight:600,color:"#7dd3fc",marginBottom:8,letterSpacing:"0.04em"}}>{c.t}</div>
-                  <div style={{fontSize:12,color:"#475569",lineHeight:1.6}}>{c.d}</div>
-                </div>
-              ))}
-            </div>
-            <p style={{textAlign:"center",marginTop:24,fontSize:12,color:"#1e293b"}}>
-
-            </p>
-          </>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:16,marginTop:8}}>
+            {[
+              {emoji:"🔐",t:"Datos únicos",d:"Cada guía tiene información exclusiva registrada en nuestra base de datos oficial"},
+              {emoji:"⚡",t:"Verificación inmediata",d:"Resultado en segundos desde cualquier dispositivo con internet"},
+              {emoji:"🛡️",t:"Base de datos segura",d:"Los datos oficiales solo los conoce Texcumar, imposibles de replicar"},
+            ].map((c,i)=>(
+              <div key={i} style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,padding:"22px 20px",textAlign:"center"}}>
+                <div style={{fontSize:30,marginBottom:10}}>{c.emoji}</div>
+                <div style={{fontSize:13,fontWeight:600,color:C.green,marginBottom:8,letterSpacing:"0.04em"}}>{c.t}</div>
+                <div style={{fontSize:12,color:C.textLow,lineHeight:1.6}}>{c.d}</div>
+              </div>
+            ))}
+          </div>
         )}
       </main>
 
       {/* FOOTER */}
-      <footer style={{borderTop:"1px solid rgba(255,255,255,0.05)",padding:"20px 32px",textAlign:"center",fontSize:12,color:"#1e3a5f",background:"rgba(0,0,0,0.25)"}}>
+      <footer style={{borderTop:`1px solid ${C.border}`,padding:"20px 32px",textAlign:"center",fontSize:12,color:C.textLow,background:"rgba(0,0,0,0.25)"}}>
         <img src={`data:image/png;base64,${LOGO_HZ}`} alt="Texcumar" style={{height:18,objectFit:"contain",filter:"brightness(0) invert(0.3)",marginBottom:8,display:"block",margin:"0 auto 8px"}}/>
         © 2026 Texcumar S.A. · Centro de Reproducción y Mejoramiento Genético de Camarón · R.U.C: 0991449663001 · Santa Elena, Ecuador
       </footer>
@@ -395,7 +453,7 @@ export default function TexcumarVerifica() {
         * { box-sizing: border-box; }
         input::placeholder { color: #1e3a5f; }
         ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-thumb { background: rgba(56,189,248,0.2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: rgba(45,190,122,0.2); border-radius: 3px; }
       `}</style>
     </div>
   );
@@ -404,7 +462,7 @@ export default function TexcumarVerifica() {
 function Section({ title, children }) {
   return (
     <div style={{marginBottom:20}}>
-      <div style={{fontSize:10,letterSpacing:"0.18em",color:"#0ea5e9",textTransform:"uppercase",marginBottom:10,paddingBottom:6,borderBottom:"1px solid rgba(14,165,233,0.15)",fontWeight:700}}>
+      <div style={{fontSize:10,letterSpacing:"0.18em",color:C.green,textTransform:"uppercase",marginBottom:10,paddingBottom:6,borderBottom:"1px solid rgba(45,190,122,0.15)",fontWeight:700}}>
         {title}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:2}}>
