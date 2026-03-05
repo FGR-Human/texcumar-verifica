@@ -294,7 +294,7 @@ export default function TexcumarVerifica() {
               onFocus={()=>setFocused(true)}
               onBlur={()=>setFocused(false)}
               onKeyDown={e=>e.key==="Enter"&&verificar()}
-              placeholder="Ej: 58498 o 001-001-000058498"
+              placeholder="Ej: 001-001-000058498"
               style={{flex:1,minWidth:220,background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,borderRadius:10,padding:"13px 18px",fontSize:17,color:C.textHi,fontFamily:C.mono,letterSpacing:"0.04em",outline:"none"}}
             />
             <button
