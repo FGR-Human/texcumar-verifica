@@ -595,3 +595,233 @@ function TexcumarVerifica() {
               </span>
             </div>
           </div>
+        </div>
+      </header>
+
+      <main style={styles.card}>
+        <div style={styles.hero}>
+          <div style={styles.heroLeft}>
+            <h1 style={styles.h1}>Verificación de Guías de Remisión</h1>
+            <p style={styles.p}>
+              Ingresa el número completo o los últimos dígitos para confirmar autenticidad.
+              Los datos mostrados provienen de la fuente oficial.
+            </p>
+
+            <form onSubmit={onSubmit} style={styles.searchBox}>
+              <div style={styles.inputWrap}>
+                <span style={styles.inputIcon}>
+                  <Icon name="search" size={18} color={COLORS.textSecondary} />
+                </span>
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Ej: 58498 o 001-001-000058498"
+                  style={styles.input(status === "not_found" || status === "error")}
+                  onFocus={(e) => setFocusRing(e.currentTarget)}
+                  onBlur={(e) => clearFocusRing(e.currentTarget)}
+                  aria-label="Número de guía"
+                />
+              </div>
+
+              <button
+                type="submit"
+                style={styles.button}
+                onMouseEnter={(e) => {
+                  if (!reducedMotion) e.currentTarget.style.transform = "translateY(-1px)";
+                }}
+                onMouseLeave={(e) => {
+                  if (!reducedMotion) e.currentTarget.style.transform = "translateY(0)";
+                }}
+              >
+                {status === "loading" ? (
+                  <>
+                    <Icon
+                      name="spinner"
+                      size={18}
+                      color={COLORS.accent}
+                      style={{ animation: reducedMotion ? "none" : "spin 900ms linear infinite" }}
+                    />
+                    Verificando…
+                  </>
+                ) : (
+                  <>
+                    <Icon name="shield" size={18} color={COLORS.accent} />
+                    Verificar
+                  </>
+                )}
+              </button>
+
+              {(status === "found" || status === "not_found" || status === "error") && (
+                <button
+                  type="button"
+                  style={styles.buttonGhost}
+                  onClick={() => {
+                    setInput("");
+                    setGuia(null);
+                    setStatus("idle");
+                    setLastQuery("");
+                    inputRef.current?.focus?.();
+                  }}
+                >
+                  Limpiar
+                </button>
+              )}
+            </form>
+          </div>
+
+          <aside style={styles.heroRight}>
+            <div style={styles.noteCard}>
+              <div style={styles.noteTitle}>Recomendación</div>
+              <div style={styles.noteText}>
+                Si el número no aparece en el portal oficial, podría tratarse de un documento no auténtico.
+                Verifica con tu ejecutivo o con Texcumar antes de proceder.
+              </div>
+              <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <a href={`https://${BRAND.website}`} target="_blank" rel="noreferrer" style={styles.link}>
+                  {BRAND.website}
+                </a>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        {/* RESULTADOS */}
+        {(status === "loading" || status === "found" || status === "not_found" || status === "error") && (
+          <div style={styles.resultCard}>
+            <div style={styles.statusBar(tone)}>
+              <Icon
+                name={tone === "success" ? "shield" : "warning"}
+                size={18}
+                color={tone === "success" ? COLORS.success : COLORS.error}
+              />
+              <div style={{ fontWeight: 900 }}>
+                {tone === "success"
+                  ? "Guía válida / verificada"
+                  : tone === "error"
+                  ? "Guía no encontrada o error"
+                  : "Estado"}
+              </div>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {lastQuery && (
+                  <button
+                    type="button"
+                    style={styles.buttonGhost}
+                    onClick={() => copyToClipboard(lastQuery)}
+                    title="Copiar número consultado"
+                  >
+                    <Icon name="copy" size={16} color={COLORS.primary} />
+                    Copiar Nº
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* LOADING SKELETON */}
+            {status === "loading" && (
+              <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
+                <Skeleton h={14} w="60%" />
+                <Skeleton h={14} w="80%" />
+                <div style={{ height: 10 }} />
+                <Skeleton h={48} />
+                <Skeleton h={48} />
+                <Skeleton h={48} />
+              </div>
+            )}
+
+            {/* NOT FOUND / ERROR */}
+            {(status === "not_found" || status === "error") && (
+              <div style={{ marginTop: 14, color: COLORS.textSecondary, lineHeight: 1.5 }}>
+                <p style={{ margin: 0 }}>
+                  Número consultado: <strong style={{ color: COLORS.primary }}>{safeText(lastQuery)}</strong>
+                </p>
+                <p style={{ margin: "8px 0 0" }}>
+                  Si crees que es un error, confirma el número o contacta a Texcumar.
+                </p>
+              </div>
+            )}
+
+            {/* FOUND */}
+            {status === "found" && guia && (
+              <div style={{ marginTop: 12 }}>
+                {/* IMPORTANTE:
+                    Aquí NO se muestran: Código SCI, Global GAP, ni Información Adicional.
+                    (Decisión del documento técnico). */}
+                <Section icon="shield" title="Identificación">
+                  <div style={{ display: "grid", gap: 10 }}>
+                    <FieldRow label="Número de guía" value={guia.numero} />
+                    <FieldRow label="Autorización" value={guia.autorizacion} />
+                    <FieldRow label="Fecha de autorización" value={guia.fechaAutorizacion} />
+                    <FieldRow label="Base" value={guia.base} />
+                  </div>
+                </Section>
+
+                <Section icon="calendar" title="Período de Transporte">
+                  <div style={{ display: "grid", gap: 10 }}>
+                    <FieldRow label="Fecha inicio" value={guia.fechaInicio} />
+                    <FieldRow label="Fecha fin" value={guia.fechaFin} />
+                  </div>
+                </Section>
+
+                <Section icon="user" title="Destinatario">
+                  <div style={{ display: "grid", gap: 10 }}>
+                    <FieldRow label="Razón social" value={guia.destinatario} />
+                    <FieldRow label="RUC destino" value={guia.rucDestino} />
+                    <FieldRow label="Sucursal / nombre" value={guia.nombreDest} />
+                    <FieldRow label="Destino" value={guia.destino} />
+                    <FieldRow label="Lugar de llegada" value={guia.llegada} />
+                    <FieldRow label="Motivo" value={guia.motivo} />
+                  </div>
+                </Section>
+
+                <Section icon="truck" title="Transportista">
+                  <div style={{ display: "grid", gap: 10 }}>
+                    <FieldRow label="Transportista" value={guia.transportista} />
+                    <FieldRow label="RUC transportista" value={guia.rucTransp} />
+                    <FieldRow label="Placa" value={guia.placa} />
+                    <FieldRow label="Partida" value={guia.partida} />
+                  </div>
+                </Section>
+
+                <Section icon="box" title="Producto">
+                  <div style={{ display: "grid", gap: 10 }}>
+                    <FieldRow label="Código producto" value={guia.codProducto} />
+                    <FieldRow label="Unidad" value={guia.unidad} />
+                    <FieldRow label="Descripción" value={guia.descripcion} />
+                    <FieldRow label="Cantidad" value={guia.cantidad} />
+                    <FieldRow label="Cantidad bruta" value={guia.cantBruta} />
+                  </div>
+                </Section>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      <footer style={styles.footer}>
+        <div>
+          © {new Date().getFullYear()} {BRAND.name} — {BRAND.subtitle}
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <span>Paleta: <strong style={{ color: COLORS.primary }}>Navy</strong> + <strong style={{ color: COLORS.accent }}>Gold</strong></span>
+          <span>•</span>
+          <a href={`https://${BRAND.website}`} target="_blank" rel="noreferrer" style={styles.link}>
+            {BRAND.website}
+          </a>
+        </div>
+      </footer>
+
+      {toast && (
+        <Toast
+          tone={toast.tone}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Render
+const rootEl = document.getElementById("root");
+ReactDOM.createRoot(rootEl).render(<TexcumarVerifica />);
