@@ -254,14 +254,14 @@ export default function TexcumarVerifica() {
       <div style={{position:"fixed",inset:0,backgroundImage:"linear-gradient(rgba(107,127,163,0.06) 1px, transparent 1px),linear-gradient(90deg, rgba(107,127,163,0.06) 1px, transparent 1px)",backgroundSize:"48px 48px",pointerEvents:"none",zIndex:0}}/>
 
       {/* HEADER */}
-      <header style={{position:"sticky",top:0,zIndex:100,borderBottom:"1px solid rgba(255,255,255,0.28)"}`,backdropFilter:"blur(16px)",background:"rgba(22,38,96,0.96)",padding:"14px 32px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <header style={{position:"sticky",top:0,zIndex:100,borderBottom:`1px solid ${C.border}`,backdropFilter:"blur(16px)",background:"rgba(22,38,96,0.96)",padding:"14px 32px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div style={{display:"flex",alignItems:"center",gap:14}}>
           <div>
             <img src={`data:image/png;base64,${LOGO_HZ}`} alt="Texcumar" style={{height:28,objectFit:"contain",filter:"brightness(0) invert(1)"}}/>
-            <div style={{fontSize:10,color:"#FFFFFF",letterSpacing:"0.18em",textTransform:"uppercase",marginTop:1}}>Portal Oficial de Verificación de Guías</div>
+            <div style={{fontSize:10,color:C.green,letterSpacing:"0.18em",textTransform:"uppercase",marginTop:1}}>Portal Oficial de Verificación de Guías</div>
           </div>
         </div>
-        <div style={{fontSize:11,color:"#FFFFFF",border:"1px solid rgba(45,190,122,0.3)",borderRadius:20,padding:"5px 14px",letterSpacing:"0.1em",textTransform:"uppercase"}}>
+        <div style={{fontSize:11,color:C.green,border:"1px solid rgba(45,190,122,0.3)",borderRadius:20,padding:"5px 14px",letterSpacing:"0.1em",textTransform:"uppercase"}}>
           R.U.C: 0991449663001
         </div>
       </header>
@@ -275,7 +275,7 @@ export default function TexcumarVerifica() {
           </div>
           <h1 style={{fontSize:"clamp(24px,4vw,38px)",fontWeight:300,lineHeight:1.25,margin:"0 0 16px",color:C.textHi,letterSpacing:"-0.02em"}}>
             Verifique la autenticidad de su<br/>
-            <span style={{fontWeight:700,color:"#FFFFFF"}}>Guía de Remisión Texcumar</span>
+            <span style={{fontWeight:700,color:C.green}}>Guía de Remisión Texcumar</span>
           </h1>
           <p style={{color:C.textMid,fontSize:15,maxWidth:500,margin:"0 auto",lineHeight:1.7}}>
             Ingrese el número de guía impreso en su documento para confirmar que fue emitido oficialmente por <strong style={{color:C.textHi}}>Texcumar S.A.</strong>
@@ -284,7 +284,7 @@ export default function TexcumarVerifica() {
 
         {/* BUSCADOR */}
         <div style={{background:C.bgCard,border:`1px solid ${focused ? C.borderAct : C.border}`,borderRadius:16,padding:"28px 32px",marginBottom:28,transition:"border-color .25s",boxShadow:focused?"0 0 50px rgba(45,190,122,0.08)":"none"}}>
-          <label style={{display:"block",fontSize:11,letterSpacing:"0.15em",color:"#FFFFFF",textTransform:"uppercase",marginBottom:12}}>
+          <label style={{display:"block",fontSize:11,letterSpacing:"0.15em",color:C.green,textTransform:"uppercase",marginBottom:12}}>
             Número de Guía de Remisión
           </label>
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
@@ -316,7 +316,7 @@ export default function TexcumarVerifica() {
 
         {/* RESULTADO VÁLIDO */}
         {estado==="found" && resultado && (
-          <div style={{animation:"fadeIn .45s ease",background:"rgba(107,127,163,0.18)",border:"1px solid rgba(226,232,240,0.95)",borderRadius:16,overflow:"hidden"}}>
+          <div style={{animation:"fadeIn .45s ease",background:"rgba(16,74,48,0.2)",border:"1px solid rgba(45,190,122,0.35)",borderRadius:16,overflow:"hidden"}}>
             {/* Banner */}
             <div style={{background:"linear-gradient(90deg, rgba(22,38,96,0.96), rgba(22,38,96,0.88))",padding:"18px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid rgba(240,181,0,0.35)",flexWrap:"wrap",gap:12}}>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -332,7 +332,7 @@ export default function TexcumarVerifica() {
             </div>
 
             <div style={{padding:"28px 28px 8px"}}>
-              <div style={{fontSize:11,letterSpacing:"0.15em",color:"#FFFFFF",textTransform:"uppercase",marginBottom:20,paddingBottom:12,borderBottom:`1px solid ${C.border}`}}>
+              <div style={{fontSize:11,letterSpacing:"0.15em",color:C.green,textTransform:"uppercase",marginBottom:20,paddingBottom:12,borderBottom:`1px solid ${C.border}`}}>
                 Datos Oficiales del Documento
               </div>
               <Section title="Identificación">
@@ -372,7 +372,7 @@ export default function TexcumarVerifica() {
               <span style={{fontSize:12,color:C.textLow}}>
                 Verificado el {new Date().toLocaleDateString("es-EC",{day:"2-digit",month:"long",year:"numeric"})}
               </span>
-              <button onClick={reset} style={{background:"transparent",border:"1px solid rgba(45,190,122,0.3)",borderRadius:8,padding:"7px 18px",color:"#FFFFFF",fontSize:12,cursor:"pointer",letterSpacing:"0.07em"}}>
+              <button onClick={reset} style={{background:"transparent",border:"1px solid rgba(45,190,122,0.3)",borderRadius:8,padding:"7px 18px",color:C.green,fontSize:12,cursor:"pointer",letterSpacing:"0.07em"}}>
                 ← Nueva consulta
               </button>
             </div>
@@ -400,13 +400,13 @@ export default function TexcumarVerifica() {
                 <div style={{marginTop:20,padding:"16px 20px",background:"rgba(248,113,113,0.08)",borderRadius:10,border:"1px solid rgba(248,113,113,0.2)"}}>
                   <div style={{fontSize:11,color:"#DC2626",fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>¿Sospecha de falsificación?</div>
                   <div style={{fontSize:13,color:C.textMid}}>
-                    Contáctenos de inmediato: <strong style={{color:"#FFFFFF"}}>+593 98 085 9115</strong> · <strong style={{color:"#FFFFFF"}}>facturaciontexcumar@texcumar.com</strong>
+                    Contáctenos de inmediato: <strong style={{color:C.green}}>+593 98 085 9115</strong> · <strong style={{color:C.green}}>facturaciontexcumar@texcumar.com</strong>
                   </div>
                 </div>
               </div>
             </div>
             <div style={{marginTop:20,textAlign:"right"}}>
-              <button onClick={reset} style={{background:"transparent",border:"1px solid rgba(45,190,122,0.3)",borderRadius:8,padding:"8px 18px",color:"#FFFFFF",fontSize:12,cursor:"pointer",letterSpacing:"0.07em"}}>
+              <button onClick={reset} style={{background:"transparent",border:"1px solid rgba(45,190,122,0.3)",borderRadius:8,padding:"8px 18px",color:C.green,fontSize:12,cursor:"pointer",letterSpacing:"0.07em"}}>
                 ← Intentar de nuevo
               </button>
             </div>
@@ -423,7 +423,7 @@ export default function TexcumarVerifica() {
             ].map((c,i)=>(
               <div key={i} style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,padding:"22px 20px",textAlign:"center"}}>
                 <div style={{fontSize:30,marginBottom:10}}>{c.emoji}</div>
-                <div style={{fontSize:13,fontWeight:600,color:"#FFFFFF",marginBottom:8,letterSpacing:"0.04em"}}>{c.t}</div>
+                <div style={{fontSize:13,fontWeight:600,color:C.green,marginBottom:8,letterSpacing:"0.04em"}}>{c.t}</div>
                 <div style={{fontSize:12,color:C.textLow,lineHeight:1.6}}>{c.d}</div>
               </div>
             ))}
@@ -452,7 +452,7 @@ export default function TexcumarVerifica() {
 function Section({ title, children }) {
   return (
     <div style={{marginBottom:20}}>
-      <div style={{fontSize:10,letterSpacing:"0.18em",color:"#FFFFFF",textTransform:"uppercase",marginBottom:10,paddingBottom:6,borderBottom:"1px solid rgba(240,181,0,0.14)",fontWeight:700}}>
+      <div style={{fontSize:10,letterSpacing:"0.18em",color:C.green,textTransform:"uppercase",marginBottom:10,paddingBottom:6,borderBottom:"1px solid rgba(240,181,0,0.14)",fontWeight:700}}>
         {title}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:2}}>
