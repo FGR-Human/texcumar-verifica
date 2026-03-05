@@ -452,7 +452,7 @@ export default function TexcumarVerifica() {
 function Section({ title, children }) {
   return (
     <div style={{marginBottom:20}}>
-      <div style={{fontSize:10,letterSpacing:"0.18em",color:"#FFFFFF",textTransform:"uppercase",marginBottom:10,paddingBottom:6,borderBottom:"1px solid rgba(255,255,255,0.28)",fontWeight:700}}>
+      <div style={{fontSize:12,letterSpacing:"0.18em",color:C.green,textTransform:"uppercase",marginBottom:10,paddingBottom:6,borderBottom:"1px solid rgba(240,181,0,0.45)",fontWeight:800}}>
         {title}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:2}}>
