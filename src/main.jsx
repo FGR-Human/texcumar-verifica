@@ -1,322 +1,597 @@
-Tienes toda la razón, te pido disculpas. El código se cortó porque las cadenas de texto (Base64) de los logos son demasiado largas y excedieron el límite de caracteres de mi respuesta.Para evitar que se vuelva a cortar, te entregaré el código completo de la interfaz (main.jsx), pero dejaré un comentario donde debes mantener tus variables LOGO_SQ, LOGO_HZ y DB originales.He aplicado exactamente lo que indica el documento técnico:Eliminación de campos: Se removieron "Código SCI", "GLOBAL GAP" y toda la sección de "Información Adicional" para simplificar la experiencia.Paleta corporativa: Se implementó el modo claro con los colores oficiales de Texcumar: Navy (#162660), Dorado (#F0B500), Fondo claro (#F4F7FB) y tarjetas blancas (#FFFFFF).Estilo del Comunicado: El encabezado ahora emula la franja del comunicado institucional (azul marino con borde inferior dorado) y el fondo tiene ondas sutiles.Aquí tienes el código completo funcional. Solo cópialo y pega tus constantes en la parte superior:JavaScriptimport { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 
-const API_URL = "https://script.google.com/macros/s/AKfycbwx0V46aQJP0Zjo7g6t-YaHgJzndSa48kGV7mR-WSnlDabcr2ybAS6MHbWk46Lso4ri/exec";
+const API_URL =
+  "https://script.google.com/macros/s/AKfycbwx0V46aQJP0Zjo7g6t-YaHgJzndSa48kGV7mR-WSnlDabcr2ybAS6MHbWk46Lso4ri/exec";
 
-// ============================================================================
-// ⚠ IMPORTANTE: PEGA AQUÍ TUS VARIABLES ORIGINALES LOGO_SQ, LOGO_HZ y DB
-// (Las omito para que el código no se corte)
-// ============================================================================
-// const LOGO_SQ = "iVBORw0K..."; 
-// const LOGO_HZ = "iVBORw0K...";
-// const DB = { ... };
-
-
-// ─── PALETA TEXCUMAR (ESTILO COMUNICADO OFICIAL) ───────────────
-const C = {
-  primary:   "#162660", // Navy oscuro 
-  accent:    "#F0B500", // Dorado 
-  bg:        "#F4F7FB", // Fondo principal claro 
-  cardBg:    "#FFFFFF", // Tarjetas 
-  waveDeco:  "rgba(107,127,163,0.08)", // Olas decorativas 
-  border:    "rgba(22,38,96,0.12)",
-  textPri:   "#162660", // Texto principal oscuro 
-  textSec:   "#6B7FAA", // Texto secundario 
-  error:     "#DC2626", // Rojo 
-  mono:      "'Courier New', monospace",
+/**
+ * LOGO:
+ * - Mantiene single-file, pero sin base64 gigante en este mensaje.
+ * - Si ya tienes LOGO_HZ base64 en tu proyecto, reemplaza LOGO_SRC por ese data-uri.
+ */
+const LOGO_SRC = "https://www.texcumar.com/wp-content/uploads/2021/06/logo-texcumar.png"; // fallback público
+const BRAND = {
+  name: "TEXCUMAR S.A.",
+  subtitle: "Portal de Verificación de Guías de Remisión",
+  website: "www.texcumar.com",
 };
 
-const CheckIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" style={{width:22,height:22}}>
-    <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z" fill="rgba(240,181,0,0.15)" stroke={C.accent} strokeWidth="1.5"/>
-    <path d="M9 12l2 2 4-4" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
+const COLORS = {
+  primary: "#162660",
+  accent: "#F0B500",
+  background: "#F4F7FB",
+  card: "#FFFFFF",
+  wave: "rgba(107,127,163,0.10)",
+  textPrimary: "#162660",
+  textSecondary: "#6B7FAA",
+  border: "#E2E8F0",
+  success: "#15803D",
+  error: "#DC2626",
+  shadow: "rgba(22,38,96,0.10)",
+};
+
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+
+const normalizeInput = (raw) => {
+  const s = (raw || "").trim();
+  // Permite: "58498" o "001-001-000058498"
+  return s.replace(/\s+/g, "");
+};
+
+const safeText = (v) => (v === null || v === undefined || v === "" ? "—" : String(v));
+
+const usePrefersReducedMotion = () => {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!mq) return;
+    setReduced(mq.matches);
+    const handler = () => setReduced(mq.matches);
+    mq.addEventListener?.("change", handler);
+    return () => mq.removeEventListener?.("change", handler);
+  }, []);
+  return reduced;
+};
+
+const Icon = ({ name = "info", size = 18, color = "currentColor", style = {} }) => {
+  const common = {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    xmlns: "http://www.w3.org/2000/svg",
+    style: { display: "inline-block", verticalAlign: "middle", ...style },
+  };
+  const stroke = {
+    stroke: color,
+    strokeWidth: 2,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+  };
+
+  const paths = {
+    search: (
+      <>
+        <circle cx="11" cy="11" r="7" {...stroke} />
+        <path d="M20 20l-3.5-3.5" {...stroke} />
+      </>
+    ),
+    shield: (
+      <>
+        <path d="M12 2l7 4v6c0 5-3 9-7 10C8 21 5 17 5 12V6l7-4z" {...stroke} />
+        <path d="M9 12l2 2 4-4" {...stroke} />
+      </>
+    ),
+    calendar: (
+      <>
+        <path d="M7 3v2M17 3v2" {...stroke} />
+        <path d="M4 8h16" {...stroke} />
+        <rect x="4" y="5" width="16" height="16" rx="2" {...stroke} />
+      </>
+    ),
+    user: (
+      <>
+        <path d="M20 21a8 8 0 0 0-16 0" {...stroke} />
+        <circle cx="12" cy="7" r="4" {...stroke} />
+      </>
+    ),
+    truck: (
+      <>
+        <path d="M3 7h11v10H3z" {...stroke} />
+        <path d="M14 10h4l3 3v4h-7" {...stroke} />
+        <circle cx="7" cy="18" r="2" {...stroke} />
+        <circle cx="18" cy="18" r="2" {...stroke} />
+      </>
+    ),
+    box: (
+      <>
+        <path d="M21 8l-9-5-9 5 9 5 9-5z" {...stroke} />
+        <path d="M3 8v8l9 5 9-5V8" {...stroke} />
+        <path d="M12 13v8" {...stroke} />
+      </>
+    ),
+    warning: (
+      <>
+        <path d="M12 9v4" {...stroke} />
+        <path d="M12 17h.01" {...stroke} />
+        <path d="M10.3 4.5L2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.5a2 2 0 0 0-3.4 0z" {...stroke} />
+      </>
+    ),
+    copy: (
+      <>
+        <rect x="9" y="9" width="11" height="11" rx="2" {...stroke} />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" {...stroke} />
+      </>
+    ),
+    spinner: (
+      <>
+        <path d="M12 2a10 10 0 1 0 10 10" {...stroke} />
+      </>
+    ),
+    info: (
+      <>
+        <circle cx="12" cy="12" r="10" {...stroke} />
+        <path d="M12 16v-5" {...stroke} />
+        <path d="M12 8h.01" {...stroke} />
+      </>
+    ),
+  };
+
+  return <svg {...common}>{paths[name] || paths.info}</svg>;
+};
+
+const GlobalStyles = () => (
+  <style>{`
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Helvetica Neue"; background: ${COLORS.background}; color: ${COLORS.textPrimary}; }
+    a { color: inherit; text-decoration: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+  `}</style>
 );
 
-const AlertIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" style={{width:22,height:22}}>
-    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke={C.error} strokeWidth="1.8" fill="rgba(220,38,38,0.1)"/>
-    <line x1="12" y1="9" x2="12" y2="13" stroke={C.error} strokeWidth="2" strokeLinecap="round"/>
-    <circle cx="12" cy="17" r="0.5" fill={C.error} stroke={C.error} strokeWidth="1.5"/>
-  </svg>
+const Skeleton = ({ h = 12, w = "100%" }) => (
+  <div
+    style={{
+      height: h,
+      width: w,
+      borderRadius: 10,
+      background:
+        "linear-gradient(90deg, rgba(107,127,163,0.10), rgba(107,127,163,0.18), rgba(107,127,163,0.10))",
+      backgroundSize: "200% 100%",
+      animation: "shimmer 1.2s ease-in-out infinite",
+    }}
+  />
 );
 
-const SearchIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" style={{width:18,height:18}}>
-    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/>
-    <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-  </svg>
+const Toast = ({ message, tone = "info", onClose }) => {
+  const bg =
+    tone === "success"
+      ? "rgba(21,128,61,0.10)"
+      : tone === "error"
+      ? "rgba(220,38,38,0.10)"
+      : "rgba(240,181,0,0.14)";
+
+  const border =
+    tone === "success"
+      ? "rgba(21,128,61,0.30)"
+      : tone === "error"
+      ? "rgba(220,38,38,0.30)"
+      : "rgba(240,181,0,0.35)";
+
+  const icon =
+    tone === "success" ? "shield" : tone === "error" ? "warning" : "info";
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        position: "fixed",
+        right: 18,
+        bottom: 18,
+        zIndex: 9999,
+        maxWidth: 420,
+        background: "#fff",
+        border: `1px solid ${border}`,
+        boxShadow: "0 16px 40px rgba(22,38,96,0.14)",
+        borderRadius: 14,
+        padding: "12px 14px",
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 10,
+      }}
+    >
+      <div
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 10,
+          background: bg,
+          display: "grid",
+          placeItems: "center",
+          flex: "0 0 auto",
+        }}
+      >
+        <Icon name={icon} size={18} color={COLORS.primary} />
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>
+          {tone === "success"
+            ? "Listo"
+            : tone === "error"
+            ? "Atención"
+            : "Información"}
+        </div>
+        <div style={{ color: COLORS.textSecondary, fontSize: 13, lineHeight: 1.35 }}>
+          {message}
+        </div>
+      </div>
+
+      <button
+        onClick={onClose}
+        aria-label="Cerrar"
+        style={{
+          border: "none",
+          background: "transparent",
+          color: COLORS.textSecondary,
+          cursor: "pointer",
+          padding: 6,
+          borderRadius: 10,
+        }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+};
+
+const Section = ({ icon, title, children }) => (
+  <section style={{ marginTop: 14 }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "10px 12px",
+        borderRadius: 14,
+        background: "rgba(22,38,96,0.04)",
+        border: `1px solid ${COLORS.border}`,
+      }}
+    >
+      <div
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 12,
+          background: "rgba(240,181,0,0.18)",
+          display: "grid",
+          placeItems: "center",
+        }}
+      >
+        <Icon name={icon} size={18} color={COLORS.primary} />
+      </div>
+      <div style={{ fontWeight: 800, color: COLORS.primary, letterSpacing: 0.2 }}>
+        {title}
+      </div>
+    </div>
+    <div style={{ marginTop: 10 }}>{children}</div>
+  </section>
 );
 
-export default function TexcumarVerifica() {
-  const [guia, setGuia] = useState("");
-  const [resultado, setResultado] = useState(null);
-  const [estado, setEstado] = useState("idle");
-  const [focused, setFocused] = useState(false);
+const FieldRow = ({ label, value }) => (
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "180px 1fr",
+      gap: 10,
+      padding: "10px 12px",
+      borderRadius: 12,
+      border: `1px solid ${COLORS.border}`,
+      background: "#fff",
+    }}
+  >
+    <div style={{ color: COLORS.textSecondary, fontSize: 13, fontWeight: 700 }}>
+      {label}
+    </div>
+    <div style={{ color: COLORS.textPrimary, fontSize: 14, fontWeight: 650 }}>
+      {safeText(value)}
+    </div>
+  </div>
+);
 
-  const normalizar = (str) => str.trim().replace(/\s+/g, "");
+function TexcumarVerifica() {
+  const reducedMotion = usePrefersReducedMotion();
+  const [input, setInput] = useState("");
+  const [status, setStatus] = useState("idle"); // idle | loading | found | not_found | error
+  const [guia, setGuia] = useState(null);
+  const [lastQuery, setLastQuery] = useState("");
+  const [toast, setToast] = useState(null);
 
-  const verificar = async () => {
-    if (!guia.trim()) return;
-    setEstado("loading");
-    setResultado(null);
-    const input = normalizar(guia).replace(/-/g, "");
+  const inputRef = useRef(null);
+
+  const styles = useMemo(() => {
+    const t = (reducedMotion) => (reducedMotion ? "none" : "transform 150ms ease, box-shadow 200ms ease");
+    return {
+      page: {
+        minHeight: "100vh",
+        background: COLORS.background,
+      },
+      header: {
+        background: COLORS.primary,
+        color: "#fff",
+        padding: "26px 18px 40px",
+        position: "relative",
+        overflow: "hidden",
+        borderBottom: `6px solid ${COLORS.accent}`,
+      },
+      wave: {
+        position: "absolute",
+        inset: 0,
+        background:
+          `radial-gradient(1200px 180px at 10% 100%, ${COLORS.wave}, transparent 60%),` +
+          `radial-gradient(900px 150px at 60% 115%, ${COLORS.wave}, transparent 55%),` +
+          `radial-gradient(700px 140px at 95% 105%, ${COLORS.wave}, transparent 60%)`,
+        pointerEvents: "none",
+      },
+      container: {
+        maxWidth: 1040,
+        margin: "0 auto",
+      },
+      brandRow: {
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        flexWrap: "wrap",
+      },
+      logo: {
+        height: 36,
+        width: "auto",
+        filter: "brightness(0) invert(1)",
+        opacity: 0.95,
+      },
+      titleWrap: { display: "flex", flexDirection: "column", gap: 2 },
+      brandName: {
+        fontWeight: 900,
+        letterSpacing: 1.2,
+        fontSize: 14,
+        opacity: 0.95,
+      },
+      brandSubtitle: {
+        fontWeight: 600,
+        fontSize: 13,
+        color: "rgba(255,255,255,0.82)",
+      },
+      card: {
+        maxWidth: 1040,
+        margin: "-28px auto 0",
+        background: "#fff",
+        border: `1px solid ${COLORS.border}`,
+        borderRadius: 18,
+        boxShadow: `0 16px 44px ${COLORS.shadow}`,
+        padding: 18,
+      },
+      hero: { display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" },
+      heroLeft: { flex: "1 1 560px", minWidth: 280 },
+      heroRight: { flex: "0 0 320px", minWidth: 260 },
+      h1: {
+        margin: 0,
+        fontSize: 26,
+        color: COLORS.primary,
+        letterSpacing: 0.2,
+      },
+      p: { margin: "6px 0 0", color: COLORS.textSecondary, lineHeight: 1.5 },
+      searchBox: {
+        marginTop: 14,
+        display: "flex",
+        gap: 10,
+        flexWrap: "wrap",
+      },
+      inputWrap: { flex: "1 1 360px", minWidth: 240, position: "relative" },
+      input: (hasError) => ({
+        width: "100%",
+        padding: "12px 14px 12px 42px",
+        borderRadius: 12,
+        border: `1px solid ${hasError ? COLORS.error : COLORS.border}`,
+        background: "#fff",
+        color: COLORS.textPrimary,
+        fontSize: 15,
+        outline: "none",
+        transition: "box-shadow 160ms ease, border-color 160ms ease",
+      }),
+      inputIcon: {
+        position: "absolute",
+        left: 12,
+        top: "50%",
+        transform: "translateY(-50%)",
+        color: COLORS.textSecondary,
+      },
+      button: {
+        padding: "12px 16px",
+        borderRadius: 12,
+        border: `1px solid ${COLORS.primary}`,
+        background: COLORS.primary,
+        color: "#fff",
+        fontWeight: 800,
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 10,
+        transition: t(reducedMotion),
+        boxShadow: `0 10px 24px ${COLORS.shadow}`,
+      },
+      buttonGhost: {
+        padding: "10px 14px",
+        borderRadius: 12,
+        border: `1px solid ${COLORS.border}`,
+        background: "#fff",
+        color: COLORS.primary,
+        fontWeight: 800,
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 10,
+        transition: t(reducedMotion),
+      },
+      badge: {
+        border: `1px solid rgba(240,181,0,0.45)`,
+        background: "rgba(240,181,0,0.15)",
+        color: COLORS.primary,
+        borderRadius: 999,
+        padding: "8px 10px",
+        display: "inline-flex",
+        gap: 8,
+        alignItems: "center",
+        fontWeight: 800,
+        fontSize: 12,
+      },
+      noteCard: {
+        borderRadius: 16,
+        border: `1px solid ${COLORS.border}`,
+        background: "linear-gradient(180deg, rgba(22,38,96,0.03), rgba(22,38,96,0.01))",
+        padding: 14,
+      },
+      noteTitle: { fontWeight: 900, marginBottom: 6, color: COLORS.primary },
+      noteText: { color: COLORS.textSecondary, fontSize: 13, lineHeight: 1.45 },
+      resultCard: {
+        marginTop: 16,
+        borderRadius: 18,
+        border: `1px solid ${COLORS.border}`,
+        background: "#fff",
+        padding: 16,
+        boxShadow: `0 12px 32px rgba(22,38,96,0.10)`,
+        transition: t(reducedMotion),
+      },
+      statusBar: (tone) => ({
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "10px 12px",
+        borderRadius: 14,
+        border:
+          tone === "success"
+            ? "1px solid rgba(21,128,61,0.30)"
+            : tone === "error"
+            ? "1px solid rgba(220,38,38,0.30)"
+            : `1px solid ${COLORS.border}`,
+        background:
+          tone === "success"
+            ? "rgba(21,128,61,0.10)"
+            : tone === "error"
+            ? "rgba(220,38,38,0.08)"
+            : "rgba(22,38,96,0.03)",
+      }),
+      footer: {
+        maxWidth: 1040,
+        margin: "18px auto 28px",
+        padding: "0 18px",
+        display: "flex",
+        justifyContent: "space-between",
+        gap: 12,
+        flexWrap: "wrap",
+        color: COLORS.textSecondary,
+        fontSize: 12,
+      },
+      link: {
+        color: COLORS.primary,
+        fontWeight: 800,
+      },
+    };
+  }, [reducedMotion]);
+
+  const setFocusRing = (el) => {
+    if (!el) return;
+    el.style.boxShadow = "0 0 0 4px rgba(240,181,0,0.22)";
+    el.style.borderColor = COLORS.accent;
+  };
+
+  const clearFocusRing = (el) => {
+    if (!el) return;
+    el.style.boxShadow = "none";
+    el.style.borderColor = COLORS.border;
+  };
+
+  const copyToClipboard = async (text) => {
     try {
-      const res = await fetch(`${API_URL}?numero=${encodeURIComponent(guia.trim())}`);
-      const data = await res.json();
-      
-      const apiFound = data && (data.encontrada === true || data.found === true);
-      const apiGuia  = data && (data.guia || data.data || data.result);
-      
-      if (apiFound && apiGuia) {
-        setResultado(apiGuia);
-        setEstado("found");
-      } else {
-        const match = Object.keys(DB).find(k => {
-          const kClean = k.replace(/-/g, "");
-          return kClean === input || kClean.endsWith(input);
-        });
-        if (match) { setResultado(DB[match]); setEstado("found"); }
-        else setEstado("not_found");
-      }
+      await navigator.clipboard.writeText(text);
+      setToast({ tone: "success", message: "Copiado al portapapeles." });
     } catch {
-      const match = Object.keys(DB).find(k => {
-        const kClean = k.replace(/-/g, "");
-        return kClean === input || kClean.endsWith(input);
-      });
-      if (match) { setResultado(DB[match]); setEstado("found"); }
-      else setEstado("not_found");
+      setToast({ tone: "error", message: "No se pudo copiar. Intenta manualmente." });
     }
   };
 
-  const reset = () => { setGuia(""); setResultado(null); setEstado("idle"); };
+  const fetchGuia = async (raw) => {
+    const numero = normalizeInput(raw);
+    if (!numero) {
+      setToast({ tone: "error", message: "Ingresa un número de guía para verificar." });
+      inputRef.current?.focus?.();
+      return;
+    }
+
+    setLastQuery(numero);
+    setStatus("loading");
+    setGuia(null);
+
+    try {
+      const url = `${API_URL}?numero=${encodeURIComponent(numero)}`;
+      const res = await fetch(url, { method: "GET" });
+      const data = await res.json();
+
+      if (data?.guia) {
+        setGuia(data.guia);
+        setStatus("found");
+        setToast({ tone: "success", message: "Guía verificada correctamente." });
+      } else if (data?.error === "not_found") {
+        setStatus("not_found");
+        setToast({
+          tone: "error",
+          message:
+            "No se encontró la guía en el sistema. Posible falsificación o número incorrecto.",
+        });
+      } else {
+        setStatus("error");
+        setToast({
+          tone: "error",
+          message: "Respuesta inesperada del servicio. Intenta nuevamente.",
+        });
+      }
+    } catch (e) {
+      setStatus("error");
+      setToast({
+        tone: "error",
+        message: "No se pudo conectar al servicio. Revisa tu conexión e intenta otra vez.",
+      });
+    }
+  };
+
+  const onSubmit = (e) => {
+    e.preventDefault();
+    fetchGuia(input);
+  };
+
+  const tone = status === "found" ? "success" : status === "not_found" || status === "error" ? "error" : "info";
 
   return (
-    <div style={{minHeight:"100vh", background:C.bg, color:C.textPri, fontFamily:"'Segoe UI', system-ui, sans-serif", fontSize:15}}>
+    <div style={styles.page}>
+      <GlobalStyles />
 
-      {/* Fondo Olas Decorativas */}
-      <div style={{position:"fixed",inset:0,backgroundImage:`radial-gradient(ellipse 150% 100% at 50% 100%, ${C.waveDeco} 0%, transparent 50%)`,pointerEvents:"none",zIndex:0}}/>
-      <div style={{position:"fixed",inset:0,backgroundImage:`repeating-radial-gradient(circle at 0 0, transparent 0, ${C.bg} 40px), repeating-linear-gradient(${C.waveDeco}, ${C.waveDeco})`, opacity:0.3, pointerEvents:"none",zIndex:0}}/>
-
-      {/* HEADER INSTITUCIONAL TEXCUMAR */}
-      <header style={{position:"sticky",top:0,zIndex:100,background:C.primary,borderBottom:`4px solid ${C.accent}`,padding:"16px 32px",display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:"0 4px 12px rgba(0,0,0,0.1)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:14}}>
-          <div>
-            <img src={`data:image/png;base64,${LOGO_HZ}`} alt="Texcumar" style={{height:32,objectFit:"contain"}}/>
-          </div>
-        </div>
-        <div style={{fontSize:11,color:C.cardBg,border:`1px solid ${C.accent}`,borderRadius:20,padding:"5px 14px",letterSpacing:"0.1em",textTransform:"uppercase"}}>
-          R.U.C: 0991449663001
-        </div>
-      </header>
-
-      <main style={{maxWidth:820,margin:"0 auto",padding:"52px 24px 80px",position:"relative",zIndex:1}}>
-
-        {/* HERO */}
-        <div style={{textAlign:"center",marginBottom:48}}>
-          <div style={{display:"inline-flex",alignItems:"center",gap:8,fontSize:11,color:C.primary,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",background:"#E8EDF5",border:`1px solid ${C.border}`,borderRadius:30,padding:"6px 18px",marginBottom:22}}>
-            <SearchIcon /> Portal de Verificación
-          </div>
-          <h1 style={{fontSize:"clamp(26px,4vw,40px)",fontWeight:300,lineHeight:1.25,margin:"0 0 16px",color:C.primary,letterSpacing:"-0.02em"}}>
-            Verifique la autenticidad de su<br/>
-            <span style={{fontWeight:800,color:C.primary}}>Guía de Remisión</span>
-          </h1>
-          <p style={{color:C.textSec,fontSize:15,maxWidth:520,margin:"0 auto",lineHeight:1.7}}>
-            Ingrese el número de guía impreso en su documento para confirmar que fue emitido oficialmente por <strong>Texcumar S.A.</strong>
-          </p>
-        </div>
-
-        {/* BUSCADOR */}
-        <div style={{background:C.cardBg,border:`2px solid ${focused ? C.accent : "transparent"}`,borderRadius:16,padding:"28px 32px",marginBottom:28,transition:"all .25s",boxShadow:"0 10px 30px rgba(22,38,96,0.05)"}}>
-          <label style={{display:"block",fontSize:11,fontWeight:700,letterSpacing:"0.15em",color:C.textSec,textTransform:"uppercase",marginBottom:12}}>
-            Número de Guía de Movilización
-          </label>
-          <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-            <input
-              value={guia}
-              onChange={e=>setGuia(e.target.value)}
-              onFocus={()=>setFocused(true)}
-              onBlur={()=>setFocused(false)}
-              onKeyDown={e=>e.key==="Enter"&&verificar()}
-              placeholder="Ej: 58498 o 001-001-000058498"
-              style={{flex:1,minWidth:220,background:"#F8FAFC",border:`1px solid ${C.border}`,borderRadius:8,padding:"14px 18px",fontSize:17,color:C.primary,fontFamily:C.mono,fontWeight:600,letterSpacing:"0.04em",outline:"none",transition:"border .2s"}}
-            />
-            <button
-              onClick={verificar}
-              disabled={estado==="loading"||!guia.trim()}
-              style={{background:estado==="loading"?"#CBD5E1":C.primary,border:"none",borderRadius:8,padding:"14px 32px",color:"white",fontWeight:700,fontSize:13,letterSpacing:"0.08em",cursor:estado==="loading"||!guia.trim()?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:8,whiteSpace:"nowrap",boxShadow:estado!=="loading"?"0 4px 14px rgba(22,38,96,0.3)":"none",transition:"all .2s"}}
-            >
-              {estado==="loading" ? (
-                <><span style={{width:16,height:16,border:"2px solid rgba(255,255,255,0.3)",borderTopColor:"white",borderRadius:"50%",display:"inline-block",animation:"spin .8s linear infinite"}}/> VERIFICANDO</>
-              ) : (
-                <><SearchIcon/> CONSULTAR</>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* RESULTADO VÁLIDO */}
-        {estado==="found" && resultado && (
-          <div style={{animation:"fadeIn .45s ease",background:C.cardBg,borderRadius:16,overflow:"hidden",boxShadow:"0 15px 40px rgba(22,38,96,0.08)",border:`1px solid ${C.border}`}}>
-            {/* Banner Institucional del Resultado */}
-            <div style={{background:C.primary,padding:"20px 32px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12,borderBottom:`3px solid ${C.accent}`}}>
-              <div style={{display:"flex",alignItems:"center",gap:16}}>
-                <CheckIcon/>
-                <div>
-                  <div style={{fontSize:15,fontWeight:700,color:"#FFFFFF",letterSpacing:"0.04em"}}>DOCUMENTO AUTÉNTICO</div>
-                  <div style={{fontSize:13,color:"#CBD5E1",marginTop:2}}>Esta guía está registrada en el sistema de Texcumar S.A.</div>
-                </div>
-              </div>
-              <div style={{background:C.accent,borderRadius:20,padding:"6px 18px",fontSize:12,color:C.primary,letterSpacing:"0.1em",fontWeight:800}}>
-                VERIFICADA ✓
-              </div>
+      <header style={styles.header}>
+        <div style={styles.wave} />
+        <div style={styles.container}>
+          <div style={styles.brandRow}>
+            <img src={LOGO_SRC} alt="Texcumar" style={styles.logo} />
+            <div style={styles.titleWrap}>
+              <div style={styles.brandName}>{BRAND.name}</div>
+              <div style={styles.brandSubtitle}>{BRAND.subtitle}</div>
             </div>
 
-            <div style={{padding:"32px"}}>
-              <Section title="1. Identificación de la Guía">
-                <Row label="N° de Guía" value={resultado.numero} mono/>
-                <Row label="N° Autorización SRI" value={resultado.autorizacion} mono small full/>
-                <Row label="Fecha Autorización" value={resultado.fechaAutorizacion}/>
-                <Row label="Base de Maduración" value={resultado.base}/>
-              </Section>
-              
-              <Section title="2. Período de Transporte">
-                <Row label="Fecha Inicio" value={resultado.fechaInicio}/>
-                <Row label="Fecha Fin" value={resultado.fechaFin}/>
-              </Section>
-              
-              <Section title="3. Destinatario">
-                <Row label="Razón Social" value={resultado.destinatario} full highlight/>
-                <Row label="R.U.C / C.I." value={resultado.rucDestino} mono/>
-                <Row label="Nombre Sucursal" value={resultado.nombreDest}/>
-                <Row label="Destino" value={resultado.destino} full/>
-                <Row label="Punto de Llegada" value={resultado.llegada} full/>
-                <Row label="Motivo de Traslado" value={resultado.motivo}/>
-              </Section>
-              
-              <Section title="4. Transportista">
-                <Row label="Nombres / Razón Social" value={resultado.transportista} full highlight/>
-                <Row label="R.U.C / C.I." value={resultado.rucTransp} mono/>
-                <Row label="Placa Vehículo" value={resultado.placa} mono/>
-                <Row label="Fecha de Partida" value={resultado.partida} full/>
-              </Section>
-              
-              <Section title="5. Detalle del Producto">
-                <Row label="Código de Producto" value={resultado.codProducto} mono/>
-                <Row label="Unidad de Medida" value={resultado.unidad}/>
-                <Row label="Descripción del Producto" value={resultado.descripcion} full highlight/>
-                <Row label="Cantidad Total" value={resultado.cantidad} highlight/>
-                <Row label="Cantidad Bruta" value={resultado.cantBruta}/>
-              </Section>
-            </div>
-
-            <div style={{background:"#F8FAFC",padding:"18px 32px",display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.border}`}}>
-              <span style={{fontSize:12,color:C.textSec,fontWeight:500}}>
-                Consulta generada el {new Date().toLocaleDateString("es-EC",{day:"2-digit",month:"long",year:"numeric"})}
+            <div style={{ marginLeft: "auto" }}>
+              <span style={styles.badge}>
+                <Icon name="shield" size={16} color={COLORS.primary} />
+                Portal oficial
               </span>
-              <button onClick={reset} style={{background:"transparent",border:`1px solid ${C.primary}`,borderRadius:6,padding:"8px 20px",color:C.primary,fontSize:13,fontWeight:600,cursor:"pointer",letterSpacing:"0.05em",transition:"all .2s"}}>
-                Nueva consulta
-              </button>
             </div>
           </div>
-        )}
-
-        {/* RESULTADO NO ENCONTRADO */}
-        {estado==="not_found" && (
-          <div style={{animation:"fadeIn .45s ease",background:C.cardBg,border:`1px solid ${C.error}`,borderRadius:16,padding:"32px",boxShadow:"0 15px 40px rgba(220,38,38,0.12)"}}>
-            <div style={{display:"flex",gap:18,alignItems:"flex-start"}}>
-              <span style={{flexShrink:0,marginTop:2}}><AlertIcon/></span>
-              <div style={{flex:1}}>
-                <div style={{fontSize:16,fontWeight:800,color:C.error,marginBottom:10,letterSpacing:"0.02em"}}>
-                  DOCUMENTO NO ENCONTRADO EN LA BASE DE DATOS
-                </div>
-                <p style={{color:C.textPri,fontSize:15,lineHeight:1.6,margin:"0 0 16px"}}>
-                  El número <code style={{fontFamily:C.mono,color:C.error,background:"#FEF2F2",padding:"3px 8px",borderRadius:4,fontWeight:700}}>{guia.trim()}</code> no corresponde a ninguna guía válida emitida por Texcumar S.A.
-                </p>
-                <div style={{fontSize:14,color:C.textSec,lineHeight:1.8}}>
-                  <strong>Posibles causas:</strong><br/>
-                  • El documento podría ser una falsificación.<br/>
-                  • El número fue ingresado con un error tipográfico.<br/>
-                  • La guía fue anulada o cancelada.
-                </div>
-                <div style={{marginTop:24,padding:"18px 22px",background:"#FEF2F2",borderRadius:10,border:`1px solid rgba(220,38,38,0.2)`}}>
-                  <div style={{fontSize:12,color:C.error,fontWeight:800,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>Reporte Inmediato de Irregularidades</div>
-                  <div style={{fontSize:14,color:C.textPri,fontWeight:500}}>
-                    Atención al cliente: <span style={{color:C.primary,fontWeight:700}}>+593 98 085 9115</span><br/>
-                    Email: <span style={{color:C.primary,fontWeight:700}}>facturaciontexcumar@texcumar.com</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div style={{marginTop:24,textAlign:"right",borderTop:`1px solid ${C.border}`,paddingTop:20}}>
-              <button onClick={reset} style={{background:C.error,border:"none",borderRadius:6,padding:"10px 24px",color:"#FFF",fontWeight:600,fontSize:13,cursor:"pointer",letterSpacing:"0.05em",boxShadow:"0 4px 12px rgba(220,38,38,0.2)"}}>
-                Verificar otro documento
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* CARDS INFO (SOLO VISIBLES AL INICIO) */}
-        {estado==="idle" && (
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:20,marginTop:10}}>
-            {[
-              {icon:"🛡️", t:"Protección Antifraude", d:"Los datos mostrados provienen directamente del ERP institucional."},
-              {icon:"⚡", t:"Consulta en Tiempo Real", d:"Verificación inmediata desde cualquier dispositivo con internet."},
-              {icon:"🔒", t:"Garantía Texcumar", d:"Asegure la procedencia legal y genética de nuestros productos."},
-            ].map((c,i)=>(
-              <div key={i} style={{background:C.cardBg,border:`1px solid ${C.border}`,borderRadius:12,padding:"24px",textAlign:"center",boxShadow:"0 4px 12px rgba(22,38,96,0.03)"}}>
-                <div style={{fontSize:32,marginBottom:12}}>{c.icon}</div>
-                <div style={{fontSize:14,fontWeight:700,color:C.primary,marginBottom:8,letterSpacing:"0.02em"}}>{c.t}</div>
-                <div style={{fontSize:13,color:C.textSec,lineHeight:1.6}}>{c.d}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </main>
-
-      {/* FOOTER */}
-      <footer style={{borderTop:`1px solid ${C.border}`,padding:"24px 32px",textAlign:"center",fontSize:13,color:C.textSec,background:C.cardBg}}>
-        <img src={`data:image/png;base64,${LOGO_HZ}`} alt="Texcumar" style={{height:22,objectFit:"contain",marginBottom:12,display:"block",margin:"0 auto 12px"}}/>
-        <div style={{fontWeight:600,color:C.primary,marginBottom:4}}>© 2026 TEXCUMAR S.A.</div>
-        <div>Centro de Reproducción y Mejoramiento Genético de Camarón</div>
-      </footer>
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-        * { box-sizing: border-box; }
-        body { margin: 0; background: ${C.bg}; }
-        input::placeholder { color: #94A3B8; font-weight: 400; font-family: 'Segoe UI', sans-serif; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: ${C.primary}; }
-      `}</style>
-    </div>
-  );
-}
-
-function Section({ title, children }) {
-  return (
-    <div style={{marginBottom:28}}>
-      <div style={{fontSize:12,letterSpacing:"0.12em",color:C.primary,textTransform:"uppercase",marginBottom:14,paddingBottom:8,borderBottom:`2px solid ${C.primary}`,fontWeight:800}}>
-        {title}
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(280px, 1fr))",gap:8}}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function Row({ label, value, mono, full, small, highlight }) {
-  return (
-    <div style={{gridColumn:full?"1/-1":"auto",padding:"12px 16px",background:"#F8FAFC",borderRadius:8,border:`1px solid ${C.border}`}}>
-      <div style={{fontSize:11,color:C.textSec,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4}}>{label}</div>
-      <div style={{fontSize:small?12:15,color:highlight?C.primary:C.textPri,fontFamily:mono?C.mono:"inherit",fontWeight:highlight||mono?700:500,wordBreak:"break-word"}}>
-        {value || "-"}
-      </div>
-    </div>
-  );
-}
-
-ReactDOM.createRoot(document.getElementById("root")).render(<TexcumarVerifica />);
