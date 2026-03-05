@@ -201,7 +201,20 @@ def get_guide_records(models, uid):
 def get_from_stock_picking(models, uid):
     """Fallback: extrae desde stock.picking si account.remission.guide no existe."""
     available = discover_fields(models, uid, "stock.picking")
-    domain = [("state", "=", "done"), ("picking_type_code", "=", "outgoing")]
+    # Descubrir estado real en stock.picking
+    sp_total = odoo_call(models, uid, "stock.picking", "search_count", [[]])
+    print(f"   stock.picking total sin filtro: {sp_total}")
+    sp_domain = [("picking_type_code", "=", "outgoing")]
+    if sp_total > 0:
+        sp_sample = odoo_call(models, uid, "stock.picking", "search_read",
+                              [[]], {"fields": ["state"], "limit": 100})
+        sp_estados = list(set(r.get("state","") for r in sp_sample if r.get("state")))
+        for pref in ["done", "validated", "authorized", "confirmed"]:
+            if pref in sp_estados:
+                sp_domain.append(("state", "=", pref))
+                print(f"   stock.picking usando state='{pref}'")
+                break
+    domain = sp_domain
     total = odoo_call(models, uid, "stock.picking", "search_count", [domain])
     fields = [f for f in ["name", "id", "partner_id", "scheduled_date",
                            "date_done", "carrier_id", "origin", "note",
