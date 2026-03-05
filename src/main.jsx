@@ -400,13 +400,13 @@ export default function TexcumarVerifica() {
                 <div style={{marginTop:20,padding:"16px 20px",background:"rgba(248,113,113,0.08)",borderRadius:10,border:"1px solid rgba(248,113,113,0.2)"}}>
                   <div style={{fontSize:11,color:"#DC2626",fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>¿Sospecha de falsificación?</div>
                   <div style={{fontSize:13,color:C.textMid}}>
-                    Contáctenos de inmediato: <strong style={{color:C.green}}>+593 98 085 9115</strong> · <strong style={{color:C.green}}>facturaciontexcumar@texcumar.com</strong>
+                    Contáctenos de inmediato: <strong style={{color:"#FFFFFF"}}>+593 98 085 9115</strong> · <strong style={{color:"#FFFFFF"}}>facturaciontexcumar@texcumar.com</strong>
                   </div>
                 </div>
               </div>
             </div>
             <div style={{marginTop:20,textAlign:"right"}}>
-              <button onClick={reset} style={{background:"transparent",border:"1px solid rgba(45,190,122,0.3)",borderRadius:8,padding:"8px 18px",color:C.green,fontSize:12,cursor:"pointer",letterSpacing:"0.07em"}}>
+              <button onClick={reset} style={{background:"transparent",border:"1px solid rgba(45,190,122,0.3)",borderRadius:8,padding:"8px 18px",color:"#FFFFFF",fontSize:12,cursor:"pointer",letterSpacing:"0.07em"}}>
                 ← Intentar de nuevo
               </button>
             </div>
