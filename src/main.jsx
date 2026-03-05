@@ -310,13 +310,13 @@ export default function TexcumarVerifica() {
             </button>
           </div>
           <div style={{marginTop:12,fontSize:12,color:C.textLow}}>
-            Ingrese el número completo tal como aparece en su guía (ej: 58498 o 001-001-000058498)
+            Ingrese el número completo tal como aparece en su guía (ej: 001-001-000058498)
           </div>
         </div>
 
         {/* RESULTADO VÁLIDO */}
         {estado==="found" && resultado && (
-          <div style={{animation:"fadeIn .45s ease",background:"rgba(16,74,48,0.2)",border:"1px solid rgba(45,190,122,0.35)",borderRadius:16,overflow:"hidden"}}>
+          <div style={{animation:"fadeIn .45s ease",background:"rgba(107,127,163,0.18)",border:"1px solid rgba(226,232,240,0.95)",borderRadius:16,overflow:"hidden"}}>
             {/* Banner */}
             <div style={{background:"linear-gradient(90deg, rgba(22,38,96,0.96), rgba(22,38,96,0.88))",padding:"18px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid rgba(240,181,0,0.35)",flexWrap:"wrap",gap:12}}>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -452,7 +452,7 @@ export default function TexcumarVerifica() {
 function Section({ title, children }) {
   return (
     <div style={{marginBottom:20}}>
-      <div style={{fontSize:10,letterSpacing:"0.18em",color:C.green,textTransform:"uppercase",marginBottom:10,paddingBottom:6,borderBottom:"1px solid rgba(240,181,0,0.14)",fontWeight:700}}>
+      <div style={{fontSize:10,letterSpacing:"0.18em",color:"#FFFFFF",textTransform:"uppercase",marginBottom:10,paddingBottom:6,borderBottom:"1px solid rgba(255,255,255,0.28)",fontWeight:700}}>
         {title}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:2}}>
