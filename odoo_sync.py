@@ -64,6 +64,15 @@ def connect_odoo():
     common = xmlrpc.client.ServerProxy(
         f"{ODOO_URL}/xmlrpc/2/common", allow_none=True
     )
+    # Listar todas las DBs disponibles para diagnóstico
+    try:
+        db_service = xmlrpc.client.ServerProxy(
+            f"{ODOO_URL}/xmlrpc/2/db", allow_none=True
+        )
+        dbs = db_service.list()
+        print(f"📋 Bases de datos disponibles: {dbs}")
+    except Exception as e:
+        print(f"⚠️ No se pudo listar DBs: {e}")
     uid = common.authenticate(ODOO_DB, ODOO_USER, ODOO_PASSWORD, {})
     if not uid:
         sys.exit("❌ Autenticación Odoo fallida. Verificar credenciales y DB.")
