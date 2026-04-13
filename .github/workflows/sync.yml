@@ -55,7 +55,7 @@ jobs:
           ODOO_PASSWORD:   ${{ secrets.ODOO_PASSWORD }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           GOOGLE_CREDS_JSON: ${{ secrets.GOOGLE_CREDS_JSON }}
-        run: python odoo_sync_v4.py
+        run: python odoo_sync.py
 
       - name: Sync modo full (manual)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.modo == 'full'
@@ -66,7 +66,7 @@ jobs:
           ODOO_PASSWORD:   ${{ secrets.ODOO_PASSWORD }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           GOOGLE_CREDS_JSON: ${{ secrets.GOOGLE_CREDS_JSON }}
-        run: python odoo_sync_v4.py --full
+        run: python odoo_sync.py --full
 
       - name: Sync modo delta manual (con fecha opcional)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.modo == 'delta'
@@ -80,9 +80,9 @@ jobs:
         run: |
           DESDE="${{ github.event.inputs.desde }}"
           if [ -n "$DESDE" ]; then
-            python odoo_sync_v4.py --desde "$DESDE"
+            python odoo_sync.py --desde "$DESDE"
           else
-            python odoo_sync_v4.py
+            python odoo_sync.py
           fi
 
       # ── 4. Notificación de fallo (opcional) ──────────────────────────────────
