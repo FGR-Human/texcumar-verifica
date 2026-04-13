@@ -1,37 +1,93 @@
-name: "Sync Odoo → Portal TEXCUMAR"
+name: Sync Odoo → Google Sheets (PRODUCCIÓN)
 
+# ─── CUÁNDO EJECUTAR ──────────────────────────────────────────────────────────
 on:
+  # Sync incremental automático cada 2 horas (captura guías del día en minutos)
   schedule:
-    - cron: "0 11 * * *"   # 06:00 Ecuador
-    - cron: "0 19 * * *"   # 14:00 Ecuador
-    - cron: "0 3 * * *"    # 22:00 Ecuador
+    - cron: '0 */2 * * *'     # cada 2 horas, UTC
+
+  # Sync manual desde GitHub Actions UI (con opción de full sync)
   workflow_dispatch:
+    inputs:
+      modo:
+        description: 'Modo de sincronización'
+        required: true
+        default: 'delta'
+        type: choice
+        options:
+          - delta      # solo guías nuevas/modificadas
+          - full       # reescribir todo el Sheet
+      desde:
+        description: 'Desde fecha YYYY-MM-DD (solo modo delta, opcional)'
+        required: false
+        default: ''
 
 jobs:
   sync:
-    name: "Sincronizar Guías"
+    name: Odoo Sync
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 30          # máximo 30 min por ejecución
 
     steps:
-      - name: "Checkout"
+      # ── 1. Código ────────────────────────────────────────────────────────────
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: "Setup Python 3.12"
+      # ── 2. Python ────────────────────────────────────────────────────────────
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: "pip"
+          python-version: '3.11'
+          cache: 'pip'
 
-      - name: "Instalar dependencias"
-        run: pip install -r requirements.txt
+      - name: Instalar dependencias
+        run: |
+          pip install --upgrade pip
+          pip install gspread google-auth google-auth-httplib2 google-api-python-client
 
-      - name: "Ejecutar sincronización"
-        run: python odoo_sync.py
+      # ── 3. Ejecutar sync ──────────────────────────────────────────────────────
+      - name: Sync delta (automático/programado)
+        if: github.event_name == 'schedule'
         env:
-          ODOO_URL:          ${{ secrets.ODOO_URL }}
-          ODOO_DB:           ${{ secrets.ODOO_DB }}
-          ODOO_USER:         ${{ secrets.ODOO_USER }}
-          ODOO_PASSWORD:     ${{ secrets.ODOO_PASSWORD }}
-          GOOGLE_SHEET_ID:   ${{ secrets.GOOGLE_SHEET_ID }}
+          ODOO_URL:        ${{ secrets.ODOO_URL }}
+          ODOO_DB:         ${{ secrets.ODOO_DB }}
+          ODOO_USER:       ${{ secrets.ODOO_USER }}
+          ODOO_PASSWORD:   ${{ secrets.ODOO_PASSWORD }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           GOOGLE_CREDS_JSON: ${{ secrets.GOOGLE_CREDS_JSON }}
+        run: python odoo_sync_v4.py
+
+      - name: Sync modo full (manual)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.modo == 'full'
+        env:
+          ODOO_URL:        ${{ secrets.ODOO_URL }}
+          ODOO_DB:         ${{ secrets.ODOO_DB }}
+          ODOO_USER:       ${{ secrets.ODOO_USER }}
+          ODOO_PASSWORD:   ${{ secrets.ODOO_PASSWORD }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_CREDS_JSON: ${{ secrets.GOOGLE_CREDS_JSON }}
+        run: python odoo_sync_v4.py --full
+
+      - name: Sync modo delta manual (con fecha opcional)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.modo == 'delta'
+        env:
+          ODOO_URL:        ${{ secrets.ODOO_URL }}
+          ODOO_DB:         ${{ secrets.ODOO_DB }}
+          ODOO_USER:       ${{ secrets.ODOO_USER }}
+          ODOO_PASSWORD:   ${{ secrets.ODOO_PASSWORD }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_CREDS_JSON: ${{ secrets.GOOGLE_CREDS_JSON }}
+        run: |
+          DESDE="${{ github.event.inputs.desde }}"
+          if [ -n "$DESDE" ]; then
+            python odoo_sync_v4.py --desde "$DESDE"
+          else
+            python odoo_sync_v4.py
+          fi
+
+      # ── 4. Notificación de fallo (opcional) ──────────────────────────────────
+      - name: Notificar fallo
+        if: failure()
+        run: |
+          echo "⚠️  El sync de Odoo → Sheets FALLÓ"
+          echo "Revisar los logs en: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
