@@ -46,6 +46,7 @@ COLUMNS = [
     "llegada", "motivo", "transportista", "rucTransp", "placa",
     "codProducto", "unidad", "descripcion", "cantidad", "cantBruta",
     "tecnico", "despacho", "gavetas", "plus",
+    "numFactura",   # ← número de factura vinculada (move_id en guide.line)
 ]
 
 # Candidatos para campos custom de TEXCUMAR
@@ -64,15 +65,6 @@ def connect_odoo():
     common = xmlrpc.client.ServerProxy(
         f"{ODOO_URL}/xmlrpc/2/common", allow_none=True
     )
-    # Listar todas las DBs disponibles para diagnóstico
-    try:
-        db_service = xmlrpc.client.ServerProxy(
-            f"{ODOO_URL}/xmlrpc/2/db", allow_none=True
-        )
-        dbs = db_service.list()
-        print(f"📋 Bases de datos disponibles: {dbs}")
-    except Exception as e:
-        print(f"⚠️ No se pudo listar DBs: {e}")
     uid = common.authenticate(ODOO_DB, ODOO_USER, ODOO_PASSWORD, {})
     if not uid:
         sys.exit("❌ Autenticación Odoo fallida. Verificar credenciales y DB.")
@@ -217,7 +209,8 @@ def fetch_guides(models, uid, since_dt=None):
 
 def fetch_guide_lines(models, uid, guide_ids):
     fields = ["id", "guide_id", "picking_id", "stock_move_lines",
-              "reason_id", "animal_qty", "partner_id"]
+              "reason_id", "animal_qty", "partner_id",
+              "move_id", "invoice_ids"]   # campos de factura
     lines = batch_search_read(models, uid,
                               "account.remission.guide.line",
                               [("guide_id", "in", guide_ids)], fields)
@@ -353,6 +346,19 @@ def build_row(guide, guide_line, stock_move, client_p, carrier_p,
     gavetas  = get_campo(GAVETAS_CANDIDATES)
     plus     = get_campo(PLUS_CANDIDATES)
 
+    # FACTURA — leer desde move_id (many2one) o primer invoice_ids
+    numFactura = ""
+    if guide_line:
+        mv = guide_line.get("move_id")
+        if mv and mv is not False:
+            # many2one devuelve [id, nombre] — el nombre ES el número de factura
+            numFactura = str(mv[1]).strip() if isinstance(mv, (list, tuple)) and len(mv) > 1 else str(mv)
+        if not numFactura:
+            inv_ids = guide_line.get("invoice_ids")
+            if inv_ids and isinstance(inv_ids, list) and len(inv_ids) > 0:
+                # many2many devuelve lista de IDs — guardamos el primero como referencia
+                numFactura = str(inv_ids[0])
+
     return [
         numero, autorizacion, fechaAutorizacion, base,
         codigoSCI, globalGAP, fechaInicio, fechaFin,
@@ -360,6 +366,7 @@ def build_row(guide, guide_line, stock_move, client_p, carrier_p,
         llegada, motivo, transportista, rucTransp, placa,
         codProducto, unidad, descripcion, cantidad, cantBruta,
         tecnico, despacho, gavetas, plus,
+        numFactura,   # ← número de factura vinculada
     ]
 
 # ─── GOOGLE SHEETS ────────────────────────────────────────────────────────────
@@ -618,7 +625,7 @@ def main():
                 "rucDestino", "nombreDest", "destino", "llegada",
                 "motivo", "transportista", "rucTransp", "placa",
                 "codProducto", "unidad", "descripcion",
-                "cantidad", "cantBruta"]:
+                "cantidad", "cantBruta", "numFactura"]:
         idx = COLUMNS.index(col)
         n   = sum(1 for r in rows if r[idx] and str(r[idx]).strip())
         pct = int(n / len(rows) * 100) if rows else 0
